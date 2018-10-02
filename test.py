@@ -6,6 +6,7 @@ from sklearn.preprocessing import QuantileTransformer
 import tensorflow as tf
 
 from MyGAN.dataset import Dataset
+from MyGAN.mygan import MyGAN, CramerGAN
 
 print("Basic tests")
 

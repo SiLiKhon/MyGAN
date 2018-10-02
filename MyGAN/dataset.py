@@ -19,9 +19,9 @@ class Dataset:
     """
 
     def __init__(self,
-                 X: np.array,
-                 Y: np.array,
-                 W: Optional[np.array] = None,
+                 X: np.ndarray,
+                 Y: np.ndarray,
+                 W: Optional[np.ndarray] = None,
                  x_labels: Optional[Iterable[str]] = None,
                  y_labels: Optional[Iterable[str]] = None) -> None:
         """
