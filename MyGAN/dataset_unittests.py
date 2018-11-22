@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 
-from MyGAN.dataset import Dataset
+import MyGAN.dataset as mds
 
 class UnitTestsDataset(unittest.TestCase):
     """
@@ -41,11 +41,11 @@ r"""b,a,c,d
         xcols = ['x1', 'x3', 'x2']
         ycols = ['y2']
         wcol = 'w'
-        self.ds = Dataset(X=self.df1[xcols].values,
-                          Y=self.df1[ycols].values,
-                          W=self.df1[wcol].values,
-                          x_labels=xcols,
-                          y_labels=ycols)
+        self.ds = mds.Dataset(X=self.df1[xcols].values,
+                              Y=self.df1[ycols].values,
+                              W=self.df1[wcol].values,
+                              x_labels=xcols,
+                              y_labels=ycols)
         self.all_cols = xcols + ycols + [wcol]  
 
 
@@ -56,9 +56,9 @@ r"""b,a,c,d
         os.remove(self.TMP_FILENAME)
 
     def test_csv(self):
-        ds = Dataset.from_csv(self.TMP_FILENAME,
-                              x_labels=['b','a'],
-                              y_labels=['c'])
+        ds = mds.Dataset.from_csv(self.TMP_FILENAME,
+                                  x_labels=['b','a'],
+                                  y_labels=['c'])
 
         self.assertTrue(ds.X.shape == (3, 2))
         self.assertTrue(ds.Y.shape == (3, 1))
@@ -69,16 +69,16 @@ r"""b,a,c,d
 
     def test_constructor(self):
         with self.assertRaises(AssertionError):
-            Dataset(X=self.df1[['x1', 'x2']].values,
-                    Y=self.df1[['y1']].values[:-1])
+            mds.Dataset(X=self.df1[['x1', 'x2']].values,
+                        Y=self.df1[['y1']].values[:-1])
         with self.assertRaises(AssertionError):
-            Dataset(X=self.df1[['x1', 'x2']].values,
-                    Y=self.df1[['y1']].values,
-                    x_labels=['x1'])
+            mds.Dataset(X=self.df1[['x1', 'x2']].values,
+                        Y=self.df1[['y1']].values,
+                        x_labels=['x1'])
         with self.assertRaises(AssertionError):
-            Dataset(X=self.df1[['x1', 'x2']].values,
-                    Y=self.df1[['y1']].values,
-                    W=self.df1['w'].values[:-1])
+            mds.Dataset(X=self.df1[['x1', 'x2']].values,
+                        Y=self.df1[['y1']].values,
+                        W=self.df1['w'].values[:-1])
 
         
         data = self.ds.data
