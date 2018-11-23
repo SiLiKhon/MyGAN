@@ -17,7 +17,7 @@ class MyGAN:
             self,
             generator_func: Callable[[tf.Tensor, int], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
-            losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor]],
+            losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, Optional[tf.Tensor]], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
         ) -> None:
         """
@@ -26,18 +26,20 @@ class MyGAN:
         Arguments:
 
         generator_func -- function to build the generator. Should follow the signature:
-            generator_func(input_X_tensor, num_output_features) -> output_tensor. All the tf variables
-            should follow the tf.get_variable paradigm to allow for weights reuse.
-        discriminator_func
-        losses_func is supposed to construct losses from discriminator outputs on generated samples,
-        real samples and their linear interpolates (for gradient penalty):
-            
-            generator_loss, discriminator_loss = losses_func(
-                    discriminator(generated_samples),
-                    discriminator(real_samples),
-                    discriminator(interpolates),
-                    weights
-                )
+            generator_func(input_X_tensor, num_output_features) -> output_Y_gen_tensor.
+            All the tf variables should follow the tf.get_variable paradigm to allow for
+            weights reuse.
+        discriminator_func -- function to build the discriminator. Should follow the
+            signature: discriminator_func(input_XY_tensor) -> output_tensor. All the tf
+            variables should follow the tf.get_variable paradigm to allow for weights
+            reuse.
+        losses_func -- function to construct losses from discriminator outputs on generated
+            samples, real samples and their linear interpolates (for gradient penalty):
+            losses_func(discriminator(generated_samples), discriminator(real_samples),
+            discriminator(interpolates), weights) -> (generator_loss, discriminator_loss)
+        train_op_func -- function to build the training operation:
+            train_op_func(generator_loss, discriminator_loss, generator_weights,
+            discriminator_weights) -> training_operation.
         """
 
         self.generator_func = generator_func
@@ -55,6 +57,16 @@ class MyGAN:
             batch_size: int,
             seed: Optional[int] = None
         ) -> None:
+        """
+        Build the graph.
+
+        Arguments:
+
+        train_ds -- MyGAN.dataset.Dataset object with data to train on.
+        batch_size -- batch size.
+        seed -- random seed to be used for dataset shuffling.        
+        """
+
         self._train_ds = train_ds
         self._weighted = (train_ds.W is not None)
         cols = ['X', 'Y', 'XY']
@@ -118,6 +130,17 @@ def get_dense(
         activations: List[Optional[Callable[[tf.Tensor], tf.Tensor]]],
         name: str = "dense"
     ) -> tf.Tensor:
+    """
+    Build a simple NN consisting of dense layers.
+
+    Arguments:
+
+    input -- input tensor.
+    widths -- list of numbers of neurons for each layer.
+    activations -- list of activation functions for each layer. Should contain None
+        elements for each layer without an activation function.
+    name -- name of the layers, optional (default = "dense").
+    """
     assert len(widths) == len(activations)
     
     output = input
@@ -138,6 +161,17 @@ def deep_wide_generator(
         depth: int = 7,
         width: int = 64
     ) -> tf.Tensor:
+    """
+    Build a generator of a simple dense NN structure.
+
+    Arguments:
+
+    input -- input tensor.
+    n_out -- size of the output (Y) space.
+    n_latent -- latent space size, optional (default = 32).
+    depth -- number of dense layers, optional (default = 7).
+    width -- number of neurons per layer, optional (default = 64).
+    """
     noise = tf.random.normal([tf.shape(input)[0], n_latent])
     input = tf.concat([noise, input], axis=1)
     return get_dense(
@@ -152,6 +186,16 @@ def deep_wide_discriminator(
         width: int = 64,
         n_out: int = 128
     ) -> tf.Tensor:
+    """
+    Build a discriminator of a simple dense NN structure.
+
+    Arguments:
+
+    input -- input tensor.
+    depth -- number of dense layers, optional (default = 7).
+    width -- number of neurons per layer, optional (default = 64).
+    n_out -- size of the output space, optional (default = 128).
+    """
     return get_dense(
             input,
             [width      for _ in range(depth - 1)] + [n_out],
@@ -182,8 +226,22 @@ def adversarial_train_op_func(
         n_disc_steps: int = 10,
         optimizer: tf.train.Optimizer = tf.train.RMSPropOptimizer(0.001)
     ) -> tf.Operation:
+    """
+    Build the adversarial train operation (n_disc_steps discriminator optimization steps
+    followed by n_gen_steps generator optimization steps).
 
+    Arguments:
 
+    generator_loss -- generator loss.
+    discriminator_loss -- discriminator loss.
+    generator_weights -- list of generator trainable weights.
+    discriminator_weights -- list of discriminator trainable weights.
+    n_gen_steps -- number of generator update steps per single train operation,
+        optional (default = 1).
+    n_disc_steps -- number of discriminator update steps per single train
+        operation, optional (default = 10).
+    optimizer -- optimizer to use, optional (default = tf.train.RMSPropOptimizer(0.001))
+    """
     disc_train_op = _op_repeat_n(
             lambda: optimizer.minimize(discriminator_loss, var_list=discriminator_weights),
             n_disc_steps
@@ -200,6 +258,9 @@ def adversarial_train_op_func(
 
 
 class CramerGAN(MyGAN):
+    """
+    GAN with Cramer metric
+    """
     def __init__(
             self,
             generator_func: Callable[[tf.Tensor, int], tf.Tensor],
@@ -248,6 +309,7 @@ class CramerGAN(MyGAN):
         return gen_loss, disc_loss
 
 def cramer_gan() -> CramerGAN:
+    """Build a CramerGAN with default architecture"""
     return CramerGAN(
         generator_func=deep_wide_generator,
         discriminator_func=deep_wide_discriminator,
