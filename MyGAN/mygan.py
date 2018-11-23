@@ -22,6 +22,13 @@ class MyGAN:
         ) -> None:
         """
         Constructor.
+
+        Arguments:
+
+        generator_func -- function to build the generator. Should follow the signature:
+            generator_func(input_X_tensor, num_output_features) -> output_tensor. All the tf variables
+            should follow the tf.get_variable paradigm to allow for weights reuse.
+        discriminator_func
         losses_func is supposed to construct losses from discriminator outputs on generated samples,
         real samples and their linear interpolates (for gradient penalty):
             
@@ -108,8 +115,8 @@ class MyGAN:
 def get_dense(
         input: tf.Tensor,
         widths: List[int],
-        activations: List[Callable[[tf.Tensor], tf.Tensor]],
-        name: Optional[str] = "dense"
+        activations: List[Optional[Callable[[tf.Tensor], tf.Tensor]]],
+        name: str = "dense"
     ) -> tf.Tensor:
     assert len(widths) == len(activations)
     
@@ -127,9 +134,9 @@ def get_dense(
 def deep_wide_generator(
         input: tf.Tensor,
         n_out: int,
-        n_latent: Optional[int] = 32,
-        depth: Optional[int] = 7,
-        width: Optional[int] = 64
+        n_latent: int = 32,
+        depth: int = 7,
+        width: int = 64
     ) -> tf.Tensor:
     noise = tf.random.normal([tf.shape(input)[0], n_latent])
     input = tf.concat([noise, input], axis=1)
@@ -141,9 +148,9 @@ def deep_wide_generator(
 
 def deep_wide_discriminator(
         input: tf.Tensor,
-        depth: Optional[int] = 7,
-        width: Optional[int] = 64,
-        n_out: Optional[int] = 128
+        depth: int = 7,
+        width: int = 64,
+        n_out: int = 128
     ) -> tf.Tensor:
     return get_dense(
             input,
@@ -171,9 +178,9 @@ def adversarial_train_op_func(
         discriminator_loss: tf.Tensor,
         generator_weights: List[tf.Variable],
         discriminator_weights: List[tf.Variable],
-        n_gen_steps: Optional[int] = 1,
-        n_disc_steps: Optional[int] = 10,
-        optimizer: Optional[tf.train.Optimizer] = tf.train.RMSPropOptimizer(0.001)
+        n_gen_steps: int = 1,
+        n_disc_steps: int = 10,
+        optimizer: tf.train.Optimizer = tf.train.RMSPropOptimizer(0.001)
     ) -> tf.Operation:
 
 
@@ -195,9 +202,9 @@ def adversarial_train_op_func(
 class CramerGAN(MyGAN):
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor], tf.Tensor],
+            generator_func: Callable[[tf.Tensor, int], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
-            train_op_func: Callable[[tf.Tensor, tf.Tensor], tf.Operation]
+            train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
         ) -> None:
         super().__init__(
                 generator_func,
