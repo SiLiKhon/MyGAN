@@ -15,7 +15,7 @@ class MyGAN:
 
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor], tf.Tensor],
+            generator_func: Callable[[tf.Tensor, int], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
             losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
@@ -66,7 +66,7 @@ class MyGAN:
             self._train_W = tf_inputs[3]
 
         with tf.variable_scope(self.gen_scope):
-            self._generator_output = self.generator_func(self._train_X)
+            self._generator_output = self.generator_func(self._train_X, train_ds.ny)
 
         with tf.variable_scope(self.disc_scope):
             self._discriminator_output_real = self.discriminator_func(self._train_XY)
@@ -104,6 +104,52 @@ class MyGAN:
     def get_disc_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.disc_scope)
 
+
+def get_dense(
+        input: tf.Tensor,
+        widths: List[int],
+        activations: List[Callable[[tf.Tensor], tf.Tensor]],
+        name: Optional[str] = "dense"
+    ) -> tf.Tensor:
+    assert len(widths) == len(activations)
+    
+    output = input
+
+    for i, (w, a) in enumerate(zip(widths, activations)):
+        output = tf.layers.dense(
+                output,
+                units=w,
+                activation=a,
+                name="{}_{}".format(name, i)
+            )
+    return output
+
+def deep_wide_generator(
+        input: tf.Tensor,
+        n_out: int,
+        n_latent: Optional[int] = 32,
+        depth: Optional[int] = 7,
+        width: Optional[int] = 64
+    ) -> tf.Tensor:
+    noise = tf.random.normal([tf.shape(input)[0], n_latent])
+    input = tf.concat([noise, input], axis=1)
+    return get_dense(
+            input,
+            [width      for _ in range(depth - 1)] + [n_out],
+            [tf.nn.relu for _ in range(depth - 1)] + [None]
+        )
+
+def deep_wide_discriminator(
+        input: tf.Tensor,
+        depth: Optional[int] = 7,
+        width: Optional[int] = 64,
+        n_out: Optional[int] = 128
+    ) -> tf.Tensor:
+    return get_dense(
+            input,
+            [width      for _ in range(depth - 1)] + [n_out],
+            [tf.nn.relu for _ in range(depth - 1)] + [None]
+        )
 
 def _op_repeat_n(
         op_f: Callable[[], tf.Operation],
@@ -194,3 +240,9 @@ class CramerGAN(MyGAN):
 
         return gen_loss, disc_loss
 
+def cramer_gan() -> CramerGAN:
+    return CramerGAN(
+        generator_func=deep_wide_generator,
+        discriminator_func=deep_wide_discriminator,
+        train_op_func=adversarial_train_op_func
+    )
