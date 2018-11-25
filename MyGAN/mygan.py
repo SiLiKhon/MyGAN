@@ -116,6 +116,11 @@ class MyGAN:
                 self.get_gen_weights(),
                 self.get_disc_weights()
             )
+        
+        with tf.control_dependencies([self._train_op]):
+            gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
+            disc_loss_summary = tf.summary.scalar('Discriminator_loss', self._disc_loss)
+            self.merged_summary = tf.summary.merge([gen_loss_summary, disc_loss_summary])
     
     def get_gen_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.gen_scope)
@@ -223,8 +228,8 @@ def adversarial_train_op_func(
         generator_weights: List[tf.Variable],
         discriminator_weights: List[tf.Variable],
         n_gen_steps: int = 1,
-        n_disc_steps: int = 10,
-        optimizer: tf.train.Optimizer = tf.train.RMSPropOptimizer(0.001)
+        n_disc_steps: int = 5,
+        optimizer: tf.train.Optimizer = tf.train.RMSPropOptimizer(0.0005)
     ) -> tf.Operation:
     """
     Build the adversarial train operation (n_disc_steps discriminator optimization steps
