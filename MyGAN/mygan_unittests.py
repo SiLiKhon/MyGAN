@@ -5,8 +5,8 @@ import os.path
 import numpy as np
 import tensorflow as tf
 
-import MyGAN.dataset as mds
-import MyGAN.mygan as mg
+from . import dataset as mds
+from .cramer_gan import cramer_gan
 
 class UnitTestsMyGan(unittest.TestCase):
     def setUp(self):
@@ -21,7 +21,7 @@ class UnitTestsMyGan(unittest.TestCase):
         Y2  = Y01.sum(axis=1).reshape((-1, 1)) / 2 + \
                 np.random.normal(loc=0.0, scale=0.01, size=(N, 1)).astype(np.float32)
         Y = np.concatenate([Y01, Y2], axis=1)
-        gan = mg.cramer_gan()
+        gan = cramer_gan()
         ds = mds.Dataset(
             X=np.ones(shape=(N, 1), dtype=np.float32),
             Y=Y
@@ -40,7 +40,7 @@ class UnitTestsMyGan(unittest.TestCase):
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
-            for i in range(1000):
+            for i in range(100):
                 _, summary = sess.run([gan._train_op, gan.merged_summary])
                 summary_writer.add_summary(summary, i)
                 if i % 20 == 0:
