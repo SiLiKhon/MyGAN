@@ -103,19 +103,20 @@ class MyGAN:
                 )
             self._discriminator_output_int = self.discriminator_func(interpolates)
 
-        self._gen_loss, self._disc_loss = self.losses_func(
-                self._discriminator_output_gen,
-                self._discriminator_output_real,
-                self._discriminator_output_int,
-                self._train_W
-            )
-        
-        self._train_op = self.train_op_func(
-                self._gen_loss,
-                self._disc_loss,
-                self.get_gen_weights(),
-                self.get_disc_weights()
-            )
+        with tf.name_scope("Training"):
+            self._gen_loss, self._disc_loss = self.losses_func(
+                    self._discriminator_output_gen,
+                    self._discriminator_output_real,
+                    self._discriminator_output_int,
+                    self._train_W
+                )
+            
+            self._train_op = self.train_op_func(
+                    self._gen_loss,
+                    self._disc_loss,
+                    self.get_gen_weights(),
+                    self.get_disc_weights()
+                )
         
         with tf.control_dependencies([self._train_op]):
             gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
