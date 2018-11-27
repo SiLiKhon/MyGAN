@@ -33,9 +33,10 @@ learning_rate = tf.train.exponential_decay(0.0005, global_step, 100, 0.95)
 gan = CramerGAN(
             generator_func=deep_wide_generator,
             discriminator_func=deep_wide_discriminator,
-            train_op_func=lambda *x: adversarial_train_op_func(
-                        *x, optimizer=tf.train.RMSPropOptimizer(learning_rate)
-                    ),
+            train_op_func=lambda gloss, dloss, gvars, dvars: adversarial_train_op_func(
+                                gloss, dloss, gvars, dvars,
+                                optimizer=tf.train.RMSPropOptimizer(learning_rate)
+                            ),
             gp_factor=100
         )
 

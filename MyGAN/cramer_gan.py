@@ -24,7 +24,8 @@ class CramerGAN(MyGAN):
         super().__init__(
                 generator_func,
                 discriminator_func,
-                lambda *x: self._losses_func(*x, gp_factor=gp_factor),
+                lambda gen, real, inter, w: self._losses_func(gen, real, inter, w,
+                                                           gp_factor=gp_factor),
                 train_op_func
             )
 
