@@ -18,12 +18,13 @@ class CramerGAN(MyGAN):
             self,
             generator_func: Callable[[tf.Tensor, int], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
-            train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
+            train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
+            gp_factor: Optional[tf.Tensor] = None
         ) -> None:
         super().__init__(
                 generator_func,
                 discriminator_func,
-                self._losses_func,
+                lambda *x: self._losses_func(*x, gp_factor=gp_factor),
                 train_op_func
             )
 
@@ -33,11 +34,15 @@ class CramerGAN(MyGAN):
             disc_output_real: tf.Tensor,
             disc_output_int: tf.Tensor,
             weights: Optional[tf.Tensor] = None,
-            name: Optional[str] = None
+            name: Optional[str] = None,
+            gp_factor: Optional[tf.Tensor] = None,
         ) -> Tuple[tf.Tensor, tf.Tensor]:
         with tf.name_scope(name, "Losses"):
             if weights is None:
                 weights = tf.ones(shape=[tf.shape(disc_output_gen)[0]])
+
+            if gp_factor is None:
+                gp_factor = tf.ones(shape=[], dtype=disc_output_int.dtype)
 
             gen1 , gen2  = tf.split(disc_output_gen , 2, axis=0)
             real1, real2 = tf.split(disc_output_real, 2, axis=0)
@@ -61,11 +66,11 @@ class CramerGAN(MyGAN):
 
                 gradients = tf.gradients(critic_int, [int1])[0]
                 slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]), axis=1)
-                penalty = tf.reduce_sum(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
+                penalty = tf.reduce_mean(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
                 penalty = tf.identity(penalty, name='gradient_penalty')
 
             with tf.name_scope("discriminator_loss"):
-                disc_loss = penalty - gen_loss
+                disc_loss = gp_factor * penalty - gen_loss
                 disc_loss = tf.identity(disc_loss, name='disc_loss')
 
             return gen_loss, disc_loss
