@@ -33,12 +33,12 @@ def make_histogram(
         ) -> np.ndarray:
         _bins = bins
 
-        fig = plt.figure(figsize=figsize)
+        fig, ax = plt.subplots(1, 1, figsize=figsize)
         if reference is not None:
-            _, _bins, _ = plt.hist(reference, bins=_bins, label=label_ref)
-        plt.hist(input, bins=_bins, label=label, alpha=alpha)
+            _, _bins, _ = ax.hist(reference, bins=_bins, label=label_ref)
+        ax.hist(input, bins=_bins, label=label, alpha=alpha)
         if label or label_ref:
-            plt.legend()
+            ax.legend()
 
         buf = io.BytesIO()
         fig.savefig(buf, format='png')
