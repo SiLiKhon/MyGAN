@@ -82,6 +82,9 @@ class Dataset:
         ] + (ldots if self.W is not None else [])
         )
 
+    def __len__(self) -> int:
+        return len(self.data)
+
     def check_similar(self: T, ds: T) -> bool:
         """
         Check if two datasets have same columns (i.e. they can be concatenated).
@@ -134,14 +137,24 @@ class Dataset:
         """
         self.XY[:] = transformer.inverse_transform(self.XY)
     
-    def get_tf(self, batch_size: int, cols: Iterable[str] = ['all'], seed: Optional[int] = None) -> List[tf.Tensor]:
+    def get_tf(
+            self,
+            batch_size: int,
+            cols: Iterable[str] = ['all'],
+            seed: Optional[int] = None,
+            make_tf_ds: bool = True
+        ) -> List[tf.Tensor]:
         """
         Get tensorflow dataset
         """
 
-        shuffler = tf.contrib.data.shuffle_and_repeat(self.data.shape[0], seed=seed)
-        shuffled_ds = shuffler(tf.data.Dataset.from_tensor_slices(self.data))
-        full_tensor = shuffled_ds.batch(batch_size).make_one_shot_iterator().get_next()
+        if make_tf_ds:
+            shuffler = tf.contrib.data.shuffle_and_repeat(self.data.shape[0], seed=seed)
+            shuffled_ds = shuffler(tf.data.Dataset.from_tensor_slices(self.data))
+            full_tensor = shuffled_ds.batch(batch_size).make_one_shot_iterator().get_next()
+        else:
+            assert seed is None, "seed is not used when make_tf_ds=False"
+            full_tensor = tf.placeholder_with_default(self.data[:batch_size], [None, self.data.shape[1]])
 
         if 'W' in ''.join(cols):
             assert self.W is not None

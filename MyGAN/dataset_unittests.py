@@ -89,21 +89,26 @@ r"""b,a,c,d
             self.assertTrue(np.allclose(data[:,i] * 10**i1, data[:,i+1] * 10**i2))
 
     def test_tf(self):
-        tf_full, = self.ds.get_tf(len(self.ds.data))
-        tf_x, tf_y, tf_yw, tf_full_, tf_xy, tf_w = \
-                self.ds.get_tf(len(self.ds.data), ['X', 'Y', 'YW', 'all', 'XY', "W"])
+        for make_tf_ds in [True, False]:
+            tf_full, = self.ds.get_tf(len(self.ds.data), make_tf_ds=make_tf_ds)
+            tf_x, tf_y, tf_yw, tf_full_, tf_xy, tf_w = \
+                    self.ds.get_tf(
+                                len(self.ds.data),
+                                ['X', 'Y', 'YW', 'all', 'XY', "W"],
+                                make_tf_ds=make_tf_ds
+                            )
 
-        with tf.Session() as sess:
-            f, f_, x, y, xy, yw, w = \
-                sess.run([tf_full, tf_full_, tf_x, tf_y, tf_xy, tf_yw, tf_w])
-        
-        nx = len(self.ds.x_labels)
-        i0 = np.argsort(f [:,0])
-        i1 = np.argsort(f_[:,0])
-        self.assertTrue(np.allclose(f [i0], self.ds.data       ))
-        self.assertTrue(np.allclose(f_[i1], self.ds.data       ))
-        self.assertTrue(np.allclose(x [i1], self.ds.X          ))
-        self.assertTrue(np.allclose(y [i1], self.ds.Y          ))
-        self.assertTrue(np.allclose(xy[i1], self.ds.XY         ))
-        self.assertTrue(np.allclose(yw[i1], self.ds.data[:,nx:]))
-        self.assertTrue(np.allclose(w [i1], self.ds.W          ))
+            with tf.Session() as sess:
+                f, f_, x, y, xy, yw, w = \
+                    sess.run([tf_full, tf_full_, tf_x, tf_y, tf_xy, tf_yw, tf_w])
+
+            nx = len(self.ds.x_labels)
+            i0 = np.argsort(f [:,0])
+            i1 = np.argsort(f_[:,0])
+            self.assertTrue(np.allclose(f [i0], self.ds.data       ))
+            self.assertTrue(np.allclose(f_[i1], self.ds.data       ))
+            self.assertTrue(np.allclose(x [i1], self.ds.X          ))
+            self.assertTrue(np.allclose(y [i1], self.ds.Y          ))
+            self.assertTrue(np.allclose(xy[i1], self.ds.XY         ))
+            self.assertTrue(np.allclose(yw[i1], self.ds.data[:,nx:]))
+            self.assertTrue(np.allclose(w [i1], self.ds.W          ))

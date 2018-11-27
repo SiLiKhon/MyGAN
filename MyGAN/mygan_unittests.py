@@ -26,22 +26,34 @@ class UnitTestsMyGan(unittest.TestCase):
             X=np.ones(shape=(N, 1), dtype=np.float32),
             Y=Y
         )
+        ds_train, ds_test = ds.split(test_size=0.2)
+        print((len(ds_train), len(ds_test)))
 
-        gan.build_graph(ds, 10000)
+        gan.build_graph(ds_train, ds_test, 10000)
 
         summary_path = os.path.join(self.temp_directory, "test_basic")
         print("Summary path is: {}".format(summary_path))
+        summary_path_train = os.path.join(summary_path, 'train')
+        summary_path_test  = os.path.join(summary_path, 'test' )
 
-        summary_writer = tf.summary.FileWriter(
-                            logdir=summary_path,
-                            graph=tf.get_default_graph(),
-                            max_queue=100,
-                            flush_secs=1)
+        summary_writer_train = tf.summary.FileWriter(
+                                                logdir=summary_path_train,
+                                                graph=tf.get_default_graph(),
+                                                max_queue=100,
+                                                flush_secs=1
+                                            )
+        summary_writer_test = tf.summary.FileWriter(
+                                                logdir=summary_path_test,
+                                                max_queue=100,
+                                                flush_secs=1
+                                            )
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for i in range(100):
                 _, summary = sess.run([gan._train_op, gan.merged_summary])
-                summary_writer.add_summary(summary, i)
-                if i % 20 == 0:
+                summary_writer_train.add_summary(summary, i)
+                if i % 5 == 0:
+                    summary = sess.run(gan.merged_summary, {gan.mode : 'test'})
+                    summary_writer_test.add_summary(summary, i)
                     print("step {}".format(i))

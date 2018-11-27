@@ -54,6 +54,7 @@ class MyGAN:
     def build_graph(
             self,
             train_ds: mds.Dataset,
+            test_ds: mds.Dataset,
             batch_size: int,
             seed: Optional[int] = None
         ) -> None:
@@ -67,39 +68,68 @@ class MyGAN:
         seed -- random seed to be used for dataset shuffling.        
         """
 
+        assert train_ds.check_similar(test_ds)
+
         self._train_ds = train_ds
+        self._test_ds = test_ds
         self._weighted = (train_ds.W is not None)
         cols = ['X', 'Y', 'XY']
         if self._weighted:
             cols += 'W'
 
-        tf_inputs = train_ds.get_tf(
-                        batch_size=batch_size,
-                        cols=cols,
-                        seed=seed
+        with tf.name_scope('Mode'):
+            self.mode = tf.placeholder_with_default('train', [], name='mode')
+
+        with tf.name_scope('Inputs'):
+            with tf.name_scope('Train'):
+                tf_inputs = train_ds.get_tf(
+                                batch_size=batch_size,
+                                cols=cols,
+                                seed=seed
+                            )
+
+            with tf.name_scope('Test'):
+                tf_inputs_test = test_ds.get_tf(
+                                     batch_size=len(test_ds),
+                                     cols=cols,
+                                     make_tf_ds=False
+                                 )
+
+
+            self._X, self._Y, self._XY = tf.case(
+                    {
+                        tf.equal(self.mode, 'train') : lambda: tf_inputs     [:3],
+                        tf.equal(self.mode, 'test' ) : lambda: tf_inputs_test[:3]
+                    },
+                    exclusive=True
+                )
+            
+            self._W = None
+            if self._weighted:
+                self._W = tf.case(
+                        {
+                            tf.equal(self.mode, 'train') : lambda: tf_inputs     [3],
+                            tf.equal(self.mode, 'test' ) : lambda: tf_inputs_test[3]
+                        },
+                        exclusive=True
                     )
 
-        self._train_X, self._train_Y, self._train_XY = tf_inputs[:3]
-        self._train_W = None
-        if self._weighted:
-            self._train_W = tf_inputs[3]
-
         with tf.variable_scope(self.gen_scope):
-            self._generator_output = self.generator_func(self._train_X, train_ds.ny)
+            self._generator_output = self.generator_func(self._X, train_ds.ny)
 
         with tf.variable_scope(self.disc_scope):
-            self._discriminator_output_real = self.discriminator_func(self._train_XY)
+            self._discriminator_output_real = self.discriminator_func(self._XY)
 
         with tf.variable_scope(self.disc_scope, reuse=True):
             self._discriminator_output_gen  = self.discriminator_func(
-                    tf.concat([self._train_X, self._generator_output], axis=1)
+                    tf.concat([self._X, self._generator_output], axis=1)
                 )
 
         with tf.variable_scope(self.disc_scope, reuse=True):
-            alpha = tf.random_uniform(shape=[batch_size, 1], minval=0., maxval=1.)
+            alpha = tf.random_uniform(shape=[tf.shape(self._XY)[0], 1], minval=0., maxval=1.)
             interpolates = (
-                    alpha * self._train_XY
-                  + (1 - alpha) * tf.concat([self._train_X, self._generator_output], axis=1)
+                    alpha * self._XY
+                  + (1 - alpha) * tf.concat([self._X, self._generator_output], axis=1)
                 )
             self._discriminator_output_int = self.discriminator_func(interpolates)
 
@@ -108,9 +138,9 @@ class MyGAN:
                     self._discriminator_output_gen,
                     self._discriminator_output_real,
                     self._discriminator_output_int,
-                    self._train_W
+                    self._W
                 )
-            
+
             self._train_op = self.train_op_func(
                     self._gen_loss,
                     self._disc_loss,
