@@ -7,6 +7,7 @@ import tensorflow as tf
 
 from . import dataset as mds
 from .cramer_gan import cramer_gan
+from . import tf_monitoring as tfmon
 
 class UnitTestsMyGan(unittest.TestCase):
     def setUp(self):
@@ -30,6 +31,14 @@ class UnitTestsMyGan(unittest.TestCase):
         print((len(ds_train), len(ds_test)))
 
         gan.build_graph(ds_train, ds_test, 10000)
+        hist_summary = tfmon.make_histogram(
+                            summary_name='Y0',
+                            input=gan._generator_output[:,0],
+                            reference=gan._Y[:,0],
+                            label='Generated',
+                            label_ref='Real'
+                        )
+        val_summary = tf.summary.merge([gan.merged_summary, hist_summary])
 
         summary_path = os.path.join(self.temp_directory, "test_basic")
         print("Summary path is: {}".format(summary_path))
@@ -54,6 +63,6 @@ class UnitTestsMyGan(unittest.TestCase):
                 _, summary = sess.run([gan._train_op, gan.merged_summary])
                 summary_writer_train.add_summary(summary, i)
                 if i % 5 == 0:
-                    summary = sess.run(gan.merged_summary, {gan.mode : 'test'})
+                    summary = sess.run(val_summary, {gan.mode : 'test'})
                     summary_writer_test.add_summary(summary, i)
                     print("step {}".format(i))

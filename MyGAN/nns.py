@@ -54,7 +54,7 @@ def deep_wide_generator(
     depth -- number of dense layers, optional (default = 7).
     width -- number of neurons per layer, optional (default = 64).
     """
-    noise = tf.random.normal([tf.shape(input)[0], n_latent])
+    noise = tf.random_normal([tf.shape(input)[0], n_latent])
     input = tf.concat([noise, input], axis=1)
     return get_dense(
             input,
