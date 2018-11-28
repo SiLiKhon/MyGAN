@@ -83,3 +83,25 @@ def deep_wide_discriminator(
             [width      for _ in range(depth - 1)] + [n_out],
             [tf.nn.relu for _ in range(depth - 1)] + [None]
         )
+
+def noise_layer(
+        input: tf.Tensor,
+        stddev: float,
+        mode: tf.Tensor
+    ) -> tf.Tensor:
+    """Simple noise layer"""
+    noise = tf.case(
+            {
+                tf.equal(mode, 'train') : tf.random_normal(
+                                                shape=tf.shape(input),
+                                                dtype=input.dtype,
+                                                stddev=stddev
+                                            ),
+                tf.equal(mode, 'test' ) : tf.zeros(
+                                                shape=tf.shape(input),
+                                                dtype=input.dtype
+                                            ),
+            },
+            exclusive=True
+        )
+    return input + noise

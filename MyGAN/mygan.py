@@ -56,7 +56,8 @@ class MyGAN:
             train_ds: mds.Dataset,
             test_ds: mds.Dataset,
             batch_size: int,
-            seed: Optional[int] = None
+            seed: Optional[int] = None,
+            noise_std: Optional[float] = None
         ) -> None:
         """
         Build the graph.
@@ -64,8 +65,10 @@ class MyGAN:
         Arguments:
 
         train_ds -- MyGAN.dataset.Dataset object with data to train on.
+        test_ds -- MyGAN.dataset.Dataset object with data to test on.
         batch_size -- batch size.
-        seed -- random seed to be used for dataset shuffling.        
+        seed -- random seed to be used for dataset shuffling, optional.
+        noise_std -- standard deviation of noise to be added to data (both X and Y), optional.
         """
 
         assert train_ds.check_similar(test_ds)
@@ -85,7 +88,8 @@ class MyGAN:
                 tf_inputs = train_ds.get_tf(
                                 batch_size=batch_size,
                                 cols=cols,
-                                seed=seed
+                                seed=seed,
+                                noise_std=noise_std
                             )
 
             with tf.name_scope('Test'):

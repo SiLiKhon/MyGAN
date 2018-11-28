@@ -10,6 +10,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.base import TransformerMixin
 import tensorflow as tf
 
+from .nns import noise_layer
+
 REPR_NROWS = 5
 
 T = TypeVar('T', bound='Dataset')
@@ -142,7 +144,8 @@ class Dataset:
             batch_size: int,
             cols: Iterable[str] = ['all'],
             seed: Optional[int] = None,
-            make_tf_ds: bool = True
+            make_tf_ds: bool = True,
+            noise_std: Optional[float] = None
         ) -> List[tf.Tensor]:
         """
         Get tensorflow dataset
@@ -158,6 +161,18 @@ class Dataset:
 
         if 'W' in ''.join(cols):
             assert self.W is not None
+
+        if noise_std is not None:
+            if self.W is None:
+                full_tensor = noise_layer(full_tensor, noise_std, tf.constant("train"))
+            else:
+                full_tensor = tf.concat(
+                                    [
+                                        noise_layer(full_tensor[:,:-1], noise_std, tf.constant("train")),
+                                        full_tensor[:,-1]
+                                    ],
+                                    axis=1
+                                )
 
         slice_map = {'all' : slice(None),
                      'X'   : slice(self.X.shape[1]),

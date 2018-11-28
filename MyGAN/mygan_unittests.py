@@ -59,7 +59,7 @@ class UnitTestsMyGan(unittest.TestCase):
 
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
-            for i in range(100):
+            for i in range(10):
                 _, summary = sess.run([gan._train_op, gan.merged_summary])
                 summary_writer_train.add_summary(summary, i)
                 if i % 5 == 0:

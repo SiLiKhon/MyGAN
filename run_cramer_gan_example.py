@@ -47,7 +47,7 @@ ds = mds.Dataset(
 
 ds_train, ds_test = ds.split(test_size=0.2)
 
-gan.build_graph(ds_train, ds_test, batch_size)
+gan.build_graph(ds_train, ds_test, batch_size, noise_std=0.1)
 hist_summaries = [tfmon.make_histogram(
                             summary_name='Y{}'.format(i),
                             input=gan._generator_output[:,i],
