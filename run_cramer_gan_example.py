@@ -57,6 +57,16 @@ hist_summaries = [tfmon.make_histogram(
                         )
                   for i in range(3)]
 
+hist_summaries += [
+            tfmon.make_histogram(
+                    summary_name='Y2_minus_Y01mean',
+                    input    =gan._generator_output[:,2] - tf.reduce_mean(gan._generator_output[:,:2], axis=1),
+                    reference=gan._Y               [:,2] - tf.reduce_mean(gan._Y               [:,:2], axis=1),
+                    label='Generated',
+                    label_ref='Real'
+                )
+        ]
+
 train_summary = tf.summary.merge([
         gan.merged_summary, tf.summary.scalar("Learning_rate", learning_rate)
     ])
