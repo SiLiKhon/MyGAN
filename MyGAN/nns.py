@@ -92,15 +92,15 @@ def noise_layer(
     """Simple noise layer"""
     noise = tf.case(
             {
-                tf.equal(mode, 'train') : tf.random_normal(
-                                                shape=tf.shape(input),
-                                                dtype=input.dtype,
-                                                stddev=stddev
-                                            ),
-                tf.equal(mode, 'test' ) : tf.zeros(
-                                                shape=tf.shape(input),
-                                                dtype=input.dtype
-                                            ),
+                tf.equal(mode, 'train') : lambda: tf.random_normal(
+                                                        shape=tf.shape(input),
+                                                        dtype=input.dtype,
+                                                        stddev=stddev
+                                                    ),
+                tf.equal(mode, 'test' ) : lambda: tf.zeros(
+                                                        shape=tf.shape(input),
+                                                        dtype=input.dtype
+                                                    ),
             },
             exclusive=True
         )
