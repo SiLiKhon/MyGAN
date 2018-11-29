@@ -58,3 +58,11 @@ def adversarial_train_op_func(
             )
     
     return gen_train_op
+
+def create_mode(
+        name: str = 'mode',
+        name_scope: str = 'Mode/'
+    ) -> tf.Tensor:
+    with tf.name_scope(name_scope):
+        mode = tf.placeholder_with_default('train', [], name=name)
+    return mode

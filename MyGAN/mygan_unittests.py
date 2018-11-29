@@ -8,6 +8,7 @@ import tensorflow as tf
 from . import dataset as mds
 from .cramer_gan import cramer_gan
 from . import tf_monitoring as tfmon
+from .train_utils import create_mode
 
 class UnitTestsMyGan(unittest.TestCase):
     def setUp(self):
@@ -30,7 +31,8 @@ class UnitTestsMyGan(unittest.TestCase):
         ds_train, ds_test = ds.split(test_size=0.2)
         print((len(ds_train), len(ds_test)))
 
-        gan.build_graph(ds_train, ds_test, 10000)
+        mode = create_mode()
+        gan.build_graph(ds_train, ds_test, 10000, mode)
         hist_summary = tfmon.make_histogram(
                             summary_name='Y0',
                             input=gan._generator_output[:,0],

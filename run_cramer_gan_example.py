@@ -12,7 +12,7 @@ from MyGAN import dataset as mds
 from MyGAN.cramer_gan import CramerGAN
 from MyGAN import tf_monitoring as tfmon
 from MyGAN.nns import deep_wide_generator, deep_wide_discriminator, noise_layer
-from MyGAN.train_utils import adversarial_train_op_func
+from MyGAN.train_utils import adversarial_train_op_func, create_mode
 
 tf.reset_default_graph()
 
@@ -30,6 +30,7 @@ global_step = tf.train.get_or_create_global_step()
 step_op = tf.assign_add(global_step, 1)
 learning_rate = tf.train.exponential_decay(0.0001, global_step, 100, 0.99)
 
+mode = create_mode()
 gan = CramerGAN(
             generator_func=lambda x, ny: deep_wide_generator(
                                 x, ny,
@@ -37,7 +38,7 @@ gan = CramerGAN(
                                 width=64
                             ),
             discriminator_func=lambda x: deep_wide_discriminator(
-                                noise_layer(x, 0.005, tf.get_default_graph().get_tensor_by_name("Mode/mode:0")),
+                                noise_layer(x, 0.005, mode),
                                 depth=7,
                                 width=64
                             ),
@@ -55,7 +56,7 @@ ds = mds.Dataset(
 
 ds_train, ds_test = ds.split(test_size=0.02)
 
-gan.build_graph(ds_train, ds_test, batch_size)
+gan.build_graph(ds_train, ds_test, batch_size, mode)
 hist_summaries = [tfmon.make_histogram(
                             summary_name='Y{}'.format(i),
                             input=gan._generator_output[:,i],

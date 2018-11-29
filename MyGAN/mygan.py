@@ -56,6 +56,7 @@ class MyGAN:
             train_ds: mds.Dataset,
             test_ds: mds.Dataset,
             batch_size: int,
+            mode: tf.Tensor,
             seed: Optional[int] = None,
             noise_std: Optional[float] = None
         ) -> None:
@@ -67,11 +68,14 @@ class MyGAN:
         train_ds -- MyGAN.dataset.Dataset object with data to train on.
         test_ds -- MyGAN.dataset.Dataset object with data to test on.
         batch_size -- batch size.
+        mode -- tensor evaluating to either 'train' or 'test' string.
         seed -- random seed to be used for dataset shuffling, optional.
         noise_std -- standard deviation of noise to be added to data (both X and Y), optional.
         """
 
         assert train_ds.check_similar(test_ds)
+
+        self.mode = mode
 
         self._train_ds = train_ds
         self._test_ds = test_ds
@@ -79,9 +83,6 @@ class MyGAN:
         cols = ['X', 'Y', 'XY']
         if self._weighted:
             cols += 'W'
-
-        with tf.name_scope('Mode'):
-            self.mode = tf.placeholder_with_default('train', [], name='mode')
 
         with tf.name_scope('Inputs'):
             with tf.name_scope('Train'):
