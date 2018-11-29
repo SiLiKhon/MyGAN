@@ -11,14 +11,14 @@ import tensorflow as tf
 from MyGAN import dataset as mds
 from MyGAN.cramer_gan import CramerGAN
 from MyGAN import tf_monitoring as tfmon
-from MyGAN.nns import deep_wide_generator, deep_wide_discriminator
+from MyGAN.nns import deep_wide_generator, deep_wide_discriminator, noise_layer
 from MyGAN.train_utils import adversarial_train_op_func
 
 tf.reset_default_graph()
 
 
-N = 1000000
-batch_size = 100000
+N = 10000000
+batch_size = 50000
 summary_path = os.path.join("log", "example", "cramer_gan")
 
 Y01 = np.random.normal(loc=0.0, scale=1., size=(N, 2)).astype(np.float32)
@@ -28,16 +28,24 @@ Y = np.concatenate([Y01, Y2], axis=1)
 
 global_step = tf.train.get_or_create_global_step()
 step_op = tf.assign_add(global_step, 1)
-learning_rate = tf.train.exponential_decay(0.0005, global_step, 100, 0.95)
+learning_rate = tf.train.exponential_decay(0.0001, global_step, 100, 0.95)
 
 gan = CramerGAN(
-            generator_func=deep_wide_generator,
-            discriminator_func=deep_wide_discriminator,
+            generator_func=lambda x, ny: deep_wide_generator(
+                                x, ny,
+                                depth=7,
+                                width=64
+                            ),
+            discriminator_func=lambda x: deep_wide_discriminator(
+                                noise_layer(x, 0.1, tf.get_default_graph().get_tensor_by_name("Mode/mode:0")),
+                                depth=7,
+                                width=64
+                            ),
             train_op_func=lambda gloss, dloss, gvars, dvars: adversarial_train_op_func(
                                 gloss, dloss, gvars, dvars,
                                 optimizer=tf.train.RMSPropOptimizer(learning_rate)
                             ),
-            gp_factor=100
+            gp_factor=10
         )
 
 ds = mds.Dataset(
@@ -45,9 +53,9 @@ ds = mds.Dataset(
     Y=Y
 )
 
-ds_train, ds_test = ds.split(test_size=0.2)
+ds_train, ds_test = ds.split(test_size=0.02)
 
-gan.build_graph(ds_train, ds_test, batch_size, noise_std=0.5)
+gan.build_graph(ds_train, ds_test, batch_size)
 hist_summaries = [tfmon.make_histogram(
                             summary_name='Y{}'.format(i),
                             input=gan._generator_output[:,i],
@@ -80,12 +88,12 @@ summary_writer_train = tf.summary.FileWriter(
                                         logdir=summary_path_train,
                                         graph=tf.get_default_graph(),
                                         max_queue=100,
-                                        flush_secs=1
+                                        flush_secs=20
                                     )
 summary_writer_test = tf.summary.FileWriter(
                                         logdir=summary_path_test,
                                         max_queue=100,
-                                        flush_secs=1
+                                        flush_secs=60
                                     )
 
 with tf.Session() as sess:
@@ -95,7 +103,7 @@ with tf.Session() as sess:
         while True:
             _, summary, i = sess.run([gan._train_op, train_summary, global_step])
             summary_writer_train.add_summary(summary, i)
-            if i % 5 == 0:
+            if i % 50 == 0:
                 summary = sess.run(val_summary, {gan.mode : 'test'})
                 summary_writer_test.add_summary(summary, i)
                 print("step {}".format(i))
