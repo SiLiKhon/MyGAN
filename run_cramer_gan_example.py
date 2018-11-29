@@ -28,7 +28,7 @@ Y = np.concatenate([Y01, Y2], axis=1)
 
 global_step = tf.train.get_or_create_global_step()
 step_op = tf.assign_add(global_step, 1)
-learning_rate = tf.train.exponential_decay(0.0001, global_step, 100, 0.95)
+learning_rate = tf.train.exponential_decay(0.0001, global_step, 100, 0.99)
 
 gan = CramerGAN(
             generator_func=lambda x, ny: deep_wide_generator(
@@ -37,7 +37,7 @@ gan = CramerGAN(
                                 width=64
                             ),
             discriminator_func=lambda x: deep_wide_discriminator(
-                                noise_layer(x, 0.1, tf.get_default_graph().get_tensor_by_name("Mode/mode:0")),
+                                noise_layer(x, 0.005, tf.get_default_graph().get_tensor_by_name("Mode/mode:0")),
                                 depth=7,
                                 width=64
                             ),
