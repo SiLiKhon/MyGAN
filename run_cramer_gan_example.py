@@ -119,7 +119,7 @@ with tf.Session() as sess:
             cur_time = time.time()
             if cur_time - last_time >= save_interval_secs:
                 last_time = cur_time
-                weights_saver.save(sess, weights_file, global_step=i)
+                weights_saver.save(sess, weights_file, global_step=i, write_meta_graph=False)
             sess.run(step_op)
     except KeyboardInterrupt:
         pass
