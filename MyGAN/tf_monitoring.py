@@ -9,8 +9,7 @@ from typing import Optional, Tuple
 import numpy as np
 import tensorflow as tf
 import matplotlib as mpl
-if 'DISPLAY' not in os.environ:
-    mpl.use("Agg")
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import PIL
 
