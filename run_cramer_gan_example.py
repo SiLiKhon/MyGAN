@@ -57,29 +57,19 @@ ds = mds.Dataset(
 ds_train, ds_test = ds.split(test_size=0.02)
 
 gan.build_graph(ds_train, ds_test, batch_size, mode)
-hist_summaries = [tfmon.make_histogram(
-                            summary_name='Y{}'.format(i),
-                            input=gan._generator_output[:,i],
-                            reference=gan._Y[:,i],
-                            label='Generated',
-                            label_ref='Real'
-                        )
-                  for i in range(3)]
 
-hist_summaries += [
-            tfmon.make_histogram(
-                    summary_name='Y2_minus_Y01mean',
-                    input    =gan._generator_output[:,2] - tf.reduce_mean(gan._generator_output[:,:2], axis=1),
-                    reference=gan._Y               [:,2] - tf.reduce_mean(gan._Y               [:,:2], axis=1),
-                    label='Generated',
-                    label_ref='Real'
-                )
-        ]
+for i in range(3):
+    gan.make_summary_histogram("Y{}".format(i), lambda Y: Y[:,i])
+
+gan.make_summary_histogram(
+                'Y2_minus_Y01mean',
+                lambda Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1)
+            )
 
 train_summary = tf.summary.merge([
         gan.merged_summary, tf.summary.scalar("Learning_rate", learning_rate)
     ])
-val_summary = tf.summary.merge([gan.merged_summary] + hist_summaries)
+val_summary = tf.summary.merge([gan.merged_summary] + gan.summary_histograms)
 
 print("Summary path is: {}".format(summary_path))
 summary_path_train = os.path.join(summary_path, 'train')
@@ -102,7 +92,7 @@ with tf.Session() as sess:
 
     try:
         while True:
-            _, summary, i = sess.run([gan._train_op, train_summary, global_step])
+            _, summary, i = sess.run([gan.train_op, train_summary, global_step])
             summary_writer_train.add_summary(summary, i)
             if i % 50 == 0:
                 summary = sess.run(val_summary, {gan.mode : 'test'})

@@ -7,6 +7,7 @@ from typing import Callable, Tuple, List, Optional
 import tensorflow as tf
 
 from . import dataset as mds
+from . import tf_monitoring as tfmon
 
 class MyGAN:
     """
@@ -50,6 +51,7 @@ class MyGAN:
         self.gen_scope = 'Generator'
         self.disc_scope = 'Discriminator'
 
+        self.summary_histograms = []
 
     def build_graph(
             self,
@@ -146,14 +148,14 @@ class MyGAN:
                     self._W
                 )
 
-            self._train_op = self.train_op_func(
+            self.train_op = self.train_op_func(
                     self._gen_loss,
                     self._disc_loss,
                     self.get_gen_weights(),
                     self.get_disc_weights()
                 )
         
-        with tf.control_dependencies([self._train_op]):
+        with tf.control_dependencies([self.train_op]):
             gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
             disc_loss_summary = tf.summary.scalar('Discriminator_loss', self._disc_loss)
             self.merged_summary = tf.summary.merge([gen_loss_summary, disc_loss_summary])
@@ -163,3 +165,18 @@ class MyGAN:
     
     def get_disc_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.disc_scope)
+
+    def make_summary_histogram(
+            self,
+            name: str,
+            func: Callable[[tf.Tensor], tf.Tensor]
+        ) -> None:
+        self.summary_histograms.append(
+                        tfmon.make_histogram(
+                                        summary_name=name,
+                                        input=func(self._generator_output),
+                                        reference=func(self._Y),
+                                        label='Generated',
+                                        label_ref='Real'
+                                    )
+                    )

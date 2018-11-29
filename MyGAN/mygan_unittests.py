@@ -33,14 +33,9 @@ class UnitTestsMyGan(unittest.TestCase):
 
         mode = create_mode()
         gan.build_graph(ds_train, ds_test, 10000, mode)
-        hist_summary = tfmon.make_histogram(
-                            summary_name='Y0',
-                            input=gan._generator_output[:,0],
-                            reference=gan._Y[:,0],
-                            label='Generated',
-                            label_ref='Real'
-                        )
-        val_summary = tf.summary.merge([gan.merged_summary, hist_summary])
+        gan.make_summary_histogram('Y0', lambda Y: Y[:,0])
+
+        val_summary = tf.summary.merge([gan.merged_summary] + gan.summary_histograms)
 
         summary_path = os.path.join(self.temp_directory, "test_basic")
         print("Summary path is: {}".format(summary_path))
@@ -62,7 +57,7 @@ class UnitTestsMyGan(unittest.TestCase):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for i in range(10):
-                _, summary = sess.run([gan._train_op, gan.merged_summary])
+                _, summary = sess.run([gan.train_op, gan.merged_summary])
                 summary_writer_train.add_summary(summary, i)
                 if i % 5 == 0:
                     summary = sess.run(val_summary, {gan.mode : 'test'})
