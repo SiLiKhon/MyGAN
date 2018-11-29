@@ -103,7 +103,7 @@ with tf.Session() as sess:
     if latest_ckpt is None:
         print("Could not find weights file in {}".format(weights_dir))
         sess.run(tf.global_variables_initializer())
-        last_time = 0
+        last_time = 0.0
     else:
         weights_saver.restore(sess, latest_ckpt)
         last_time = time.time()
