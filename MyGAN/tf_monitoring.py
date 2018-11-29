@@ -22,7 +22,7 @@ def make_histogram(
         label_ref: str = '',
         alpha: float = 0.7,
         figsize: Tuple[float, float] = (7., 7.)
-    ) -> tf.Operation:
+    ) -> tf.Tensor:
     if label_ref:
         assert reference is not None, "Reference label given, but reference is None"
     

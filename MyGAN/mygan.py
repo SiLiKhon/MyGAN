@@ -51,7 +51,7 @@ class MyGAN:
         self.gen_scope = 'Generator'
         self.disc_scope = 'Discriminator'
 
-        self.summary_histograms = []
+        self.summary_histograms: List[tf.Tensor] = []
 
     def build_graph(
             self,
