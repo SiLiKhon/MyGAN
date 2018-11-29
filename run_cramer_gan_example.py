@@ -4,6 +4,7 @@ os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
 os.environ['CUDA_VISIBLE_DEVICES']='1'
 
 import os.path
+import time
 
 import numpy as np
 import tensorflow as tf
@@ -19,7 +20,15 @@ tf.reset_default_graph()
 
 N = 10000000
 batch_size = 50000
-summary_path = os.path.join("log", "example", "cramer_gan")
+save_interval_secs = 30 * 60
+validation_interval_steps = 50
+summary_path = os.path.join("log"    , "example", "cramer_gan")
+weights_dir  = os.path.join("weights", "example", "cramer_gan")
+
+
+if not os.path.isdir(weights_dir):
+    os.makedirs(weights_dir)
+weights_file = os.path.join(weights_dir, 'cramer_gan.ckpt')
 
 Y01 = np.random.normal(loc=0.0, scale=1., size=(N, 2)).astype(np.float32)
 Y2  = Y01.sum(axis=1).reshape((-1, 1)) / 2 + \
@@ -86,19 +95,31 @@ summary_writer_test = tf.summary.FileWriter(
                                         max_queue=100,
                                         flush_secs=60
                                     )
+weights_saver = tf.train.Saver()
 
 with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+    latest_ckpt = tf.train.latest_checkpoint(weights_dir)
+
+    if latest_ckpt is None:
+        print("Could not find weights file in {}".format(weights_dir))
+        sess.run(tf.global_variables_initializer())
+        last_time = 0
+    else:
+        weights_saver.restore(sess, latest_ckpt)
+        last_time = time.time()
 
     try:
         while True:
             _, summary, i = sess.run([gan.train_op, train_summary, global_step])
             summary_writer_train.add_summary(summary, i)
-            if i % 50 == 0:
+            if i % validation_interval_steps == 0:
                 summary = sess.run(val_summary, {gan.mode : 'test'})
                 summary_writer_test.add_summary(summary, i)
                 print("step {}".format(i))
-            
+            cur_time = time.time()
+            if cur_time - last_time >= save_interval_secs:
+                last_time = cur_time
+                weights_saver.save(sess, weights_file, global_step=i)
             sess.run(step_op)
     except KeyboardInterrupt:
         pass

@@ -2,7 +2,7 @@
 Basic NN architectures
 """
 
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, Union
 
 import tensorflow as tf
 
@@ -86,7 +86,7 @@ def deep_wide_discriminator(
 
 def noise_layer(
         input: tf.Tensor,
-        stddev: float,
+        stddev: Union[float, tf.Tensor],
         mode: tf.Tensor
     ) -> tf.Tensor:
     """Simple noise layer"""
