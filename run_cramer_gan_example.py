@@ -18,10 +18,11 @@ from MyGAN.train_utils import adversarial_train_op_func, create_mode
 tf.reset_default_graph()
 
 
-N = 10000000
-batch_size = 50000
+N = 1000000
+batch_size = 10000
 save_interval_secs = 30 * 60
-validation_interval_steps = 50
+keep_checkpoint_every_n_hours = 2
+validation_interval_steps = 200
 summary_path = os.path.join("log"    , "example", "cramer_gan")
 weights_dir  = os.path.join("weights", "example", "cramer_gan")
 
@@ -95,7 +96,7 @@ summary_writer_test = tf.summary.FileWriter(
                                         max_queue=100,
                                         flush_secs=60
                                     )
-weights_saver = tf.train.Saver()
+weights_saver = tf.train.Saver(keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
 
 with tf.Session() as sess:
     latest_ckpt = tf.train.latest_checkpoint(weights_dir)
