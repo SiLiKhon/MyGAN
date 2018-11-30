@@ -169,14 +169,18 @@ class MyGAN:
     def make_summary_histogram(
             self,
             name: str,
-            func: Callable[[tf.Tensor], tf.Tensor]
+            func: Callable[[tf.Tensor], tf.Tensor],
+            name_scope: str = 'Monitoring/'
         ) -> None:
-        self.summary_histograms.append(
-                        tfmon.make_histogram(
-                                        summary_name=name,
-                                        input=func(self._generator_output),
-                                        reference=func(self._Y),
-                                        label='Generated',
-                                        label_ref='Real'
-                                    )
-                    )
+        with tf.name_scope(name_scope):
+            self.summary_histograms.append(
+                            tfmon.make_histogram(
+                                            summary_name=name,
+                                            input=func(self._generator_output),
+                                            input_w=self._W,
+                                            reference=func(self._Y),
+                                            reference_w=self._W,
+                                            label='Generated',
+                                            label_ref='Real'
+                                        )
+                        )
