@@ -38,7 +38,6 @@ Y = np.concatenate([Y01, Y2], axis=1)
 
 global_step = tf.train.get_or_create_global_step()
 step_op = tf.assign_add(global_step, 1)
-learning_rate = tf.train.exponential_decay(0.0001, global_step, 100, 0.99)
 
 mode = create_mode()
 gan = CramerGAN(
@@ -54,14 +53,16 @@ gan = CramerGAN(
                             ),
             train_op_func=lambda gloss, dloss, gvars, dvars: adversarial_train_op_func(
                                 gloss, dloss, gvars, dvars,
-                                optimizer=tf.train.RMSPropOptimizer(learning_rate)
+                                optimizer=tf.train.RMSPropOptimizer(0.00001)
                             ),
-            gp_factor=10
+            gp_factor=10,
+            gp_mode='zero_data_only'
         )
 
 ds = mds.Dataset(
     X=np.ones(shape=(N, 1), dtype=np.float32),
-    Y=Y
+    Y=Y,
+    W=((Y[:,0] % 2) > 1).astype(np.float32) * 0.5 + 0.75
 )
 
 ds_train, ds_test = ds.split(test_size=0.02)
@@ -76,9 +77,7 @@ gan.make_summary_histogram(
                 lambda Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1)
             )
 
-train_summary = tf.summary.merge([
-        gan.merged_summary, tf.summary.scalar("Learning_rate", learning_rate)
-    ])
+train_summary = gan.merged_summary
 val_summary = tf.summary.merge([gan.merged_summary] + gan.summary_histograms)
 
 print("Summary path is: {}".format(summary_path))
