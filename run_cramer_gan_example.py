@@ -76,9 +76,10 @@ gan.make_summary_histogram(
                 'Y2_minus_Y01mean',
                 lambda Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1)
             )
+gan.make_summary_energy()
 
 train_summary = gan.merged_summary
-val_summary = tf.summary.merge([gan.merged_summary] + gan.summary_histograms)
+val_summary = tf.summary.merge([gan.merged_summary, gan.summary_energy] + gan.summary_histograms)
 
 print("Summary path is: {}".format(summary_path))
 summary_path_train = os.path.join(summary_path, 'train')

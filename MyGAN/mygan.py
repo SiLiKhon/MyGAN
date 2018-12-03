@@ -8,6 +8,7 @@ import tensorflow as tf
 
 from . import dataset as mds
 from . import tf_monitoring as tfmon
+from .metric import energy_distance_bootstrap
 
 class MyGAN:
     """
@@ -184,3 +185,18 @@ class MyGAN:
                                             label_ref='Real'
                                         )
                         )
+
+    def make_summary_energy(
+            self,
+            name: str = 'energy_distance',
+            name_scope: str = 'Monitoring/',
+            n_samples: int = 100
+        ) -> None:
+        with tf.name_scope(name_scope):
+            energy = energy_distance_bootstrap(
+                                        self._generator_output,
+                                        self._Y,
+                                        self._W,
+                                        n_samples
+                                    )
+            self.summary_energy = tf.summary.histogram(name, energy)
