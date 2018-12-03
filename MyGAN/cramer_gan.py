@@ -98,7 +98,7 @@ class CramerGAN(MyGAN):
                 disc_loss = (
                         gp_factor * penalty - gen_loss
                         if gp_factor is not None else
-                        -gen_loss
+                        tf.negative(gen_loss)
                         )
                 disc_loss = tf.identity(disc_loss, name='disc_loss')
 
