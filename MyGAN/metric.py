@@ -19,7 +19,7 @@ def energy_distance_bootstrap(
         if w is None:
             w = tf.ones(shape=N, dtype=X.dtype)
 
-        ids = tf.multinomial(tf.ones(shape=(n_samples, tf.shape(X)[0])), tf.shape(X)[0])
+        ids = tf.random_uniform(shape=[n_samples, N], maxval=N, dtype=tf.int32)
 
         X_batches = tf.gather(X, ids)
         Y_batches = tf.gather(Y, ids)
