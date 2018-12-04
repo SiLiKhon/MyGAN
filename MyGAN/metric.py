@@ -15,6 +15,8 @@ def energy_distance_bootstrap(
     ) -> tf.Tensor:
     with tf.control_dependencies([tf.assert_equal(tf.shape(X), tf.shape(Y))]):
         N = tf.shape(X)[0]
+        X = tf.reshape(X, [N, -1])
+        Y = tf.reshape(Y, [N, -1])
         mid = N // 2
         if w is None:
             w = tf.ones(shape=N, dtype=X.dtype)
