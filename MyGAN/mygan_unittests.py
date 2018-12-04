@@ -34,9 +34,10 @@ class UnitTestsMyGan(unittest.TestCase):
         mode = create_mode()
         gan.build_graph(ds_train, ds_test, 10000, mode)
         gan.make_summary_histogram('Y0', lambda Y: Y[:,0])
-        gan.make_summary_energy()
+        gan.make_summary_energy(name='energy_distance_full')
 
-        val_summary = tf.summary.merge([gan.merged_summary, gan.summary_energy] + gan.summary_histograms)
+        train_summary = tf.summary.merge(gan.train_summaries)
+        val_summary   = tf.summary.merge(gan.test_summaries)
 
         summary_path = os.path.join(self.temp_directory, "test_basic")
         print("Summary path is: {}".format(summary_path))
@@ -58,7 +59,7 @@ class UnitTestsMyGan(unittest.TestCase):
         with tf.Session() as sess:
             sess.run(tf.global_variables_initializer())
             for i in range(10):
-                _, summary = sess.run([gan.train_op, gan.merged_summary])
+                _, summary = sess.run([gan.train_op, train_summary])
                 summary_writer_train.add_summary(summary, i)
                 if i % 5 == 0:
                     summary = sess.run(val_summary, {gan.mode : 'test'})

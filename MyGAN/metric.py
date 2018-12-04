@@ -30,9 +30,9 @@ def energy_distance_bootstrap(
         w1, w2 = w_batches[:,:mid], w_batches[:,mid:]
 
         result = (
-            tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X1 - Y1), axis=2)) * w1     , axis=1) / tf.reduce_sum(w1     , axis=1)
-          + tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X2 - Y2), axis=2)) * w2     , axis=1) / tf.reduce_sum(w2     , axis=1)
-          - tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X2 - X1), axis=2)) * w1 * w2, axis=1) / tf.reduce_sum(w1 * w2, axis=1)
-          - tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(Y2 - Y1), axis=2)) * w1 * w2, axis=1) / tf.reduce_sum(w1 * w2, axis=1)
-        )
+            tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X1 - Y2), axis=2)) * w1 * w2, axis=1)
+          + tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X2 - Y1), axis=2)) * w1 * w2, axis=1)
+          - tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(X2 - X1), axis=2)) * w1 * w2, axis=1)
+          - tf.reduce_sum(tf.sqrt(tf.reduce_sum(tf.square(Y2 - Y1), axis=2)) * w1 * w2, axis=1)
+        ) / tf.reduce_sum(w1 * w2, axis=1)
         return result

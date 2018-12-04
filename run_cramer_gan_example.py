@@ -76,10 +76,15 @@ gan.make_summary_histogram(
                 'Y2_minus_Y01mean',
                 lambda Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1)
             )
-gan.make_summary_energy()
+gan.make_summary_energy(name='energy_distance_full')
+for i in range(3):
+    gan.make_summary_energy(name='energy_distance_Y{}'.format(i),
+                            projection_func=lambda X, Y: Y[:,i])
+gan.make_summary_energy(name='energy_distance_Y2_minus_Y01mean',
+                        projection_func=lambda X, Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1))
 
-train_summary = gan.merged_summary
-val_summary = tf.summary.merge([gan.merged_summary, gan.summary_energy] + gan.summary_histograms)
+train_summary = tf.summary.merge(gan.train_summaries)
+val_summary   = tf.summary.merge(gan.test_summaries)
 
 print("Summary path is: {}".format(summary_path))
 summary_path_train = os.path.join(summary_path, 'train')

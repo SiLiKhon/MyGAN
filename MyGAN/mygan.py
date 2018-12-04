@@ -52,7 +52,8 @@ class MyGAN:
         self.gen_scope = 'Generator'
         self.disc_scope = 'Discriminator'
 
-        self.summary_histograms: List[tf.Tensor] = []
+        self.train_summaries: List[tf.Tensor] = []
+        self.test_summaries: List[tf.Tensor] = []
 
     def build_graph(
             self,
@@ -124,20 +125,21 @@ class MyGAN:
 
         with tf.variable_scope(self.gen_scope):
             self._generator_output = self.generator_func(self._X, train_ds.ny)
+            self._generator_output_XY = tf.concat([self._X, self._generator_output], axis=1)
 
         with tf.variable_scope(self.disc_scope):
             self._discriminator_output_real = self.discriminator_func(self._XY)
 
         with tf.variable_scope(self.disc_scope, reuse=True):
             self._discriminator_output_gen  = self.discriminator_func(
-                    tf.concat([self._X, self._generator_output], axis=1)
+                    self._generator_output_XY
                 )
 
         with tf.variable_scope(self.disc_scope, reuse=True):
             alpha = tf.random_uniform(shape=[tf.shape(self._XY)[0], 1], minval=0., maxval=1.)
             interpolates = (
                     alpha * self._XY
-                  + (1 - alpha) * tf.concat([self._X, self._generator_output], axis=1)
+                  + (1 - alpha) * self._generator_output_XY
                 )
             self._discriminator_output_int = self.discriminator_func(interpolates)
 
@@ -159,7 +161,8 @@ class MyGAN:
         with tf.control_dependencies([self.train_op]):
             gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
             disc_loss_summary = tf.summary.scalar('Discriminator_loss', self._disc_loss)
-            self.merged_summary = tf.summary.merge([gen_loss_summary, disc_loss_summary])
+            self.train_summaries += [gen_loss_summary, disc_loss_summary]
+            self.test_summaries  += [gen_loss_summary, disc_loss_summary]
     
     def get_gen_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.gen_scope)
@@ -171,32 +174,52 @@ class MyGAN:
             self,
             name: str,
             func: Callable[[tf.Tensor], tf.Tensor],
-            name_scope: str = 'Monitoring/'
+            name_scope: str = 'Monitoring/',
+            train_summary: bool = False,
+            test_summary: bool = True
         ) -> None:
+        assert train_summary or test_summary
+
         with tf.name_scope(name_scope):
-            self.summary_histograms.append(
-                            tfmon.make_histogram(
-                                            summary_name=name,
-                                            input=func(self._generator_output),
-                                            input_w=self._W,
-                                            reference=func(self._Y),
-                                            reference_w=self._W,
-                                            label='Generated',
-                                            label_ref='Real'
-                                        )
-                        )
+            hist_summary = tfmon.make_histogram(
+                                        summary_name=name,
+                                        input=func(self._generator_output),
+                                        input_w=self._W,
+                                        reference=func(self._Y),
+                                        reference_w=self._W,
+                                        label='Generated',
+                                        label_ref='Real'
+                                    )
+            if train_summary:
+                self.train_summaries.append(hist_summary)
+            if test_summary:
+                self.test_summaries.append(hist_summary)
+
 
     def make_summary_energy(
             self,
-            name: str = 'energy_distance',
+            name: str,
+            projection_func: Optional[Callable[[tf.Tensor, tf.Tensor], tf.Tensor]] = None,
             name_scope: str = 'Monitoring/',
-            n_samples: int = 100
+            n_samples: int = 100,
+            train_summary: bool = False,
+            test_summary: bool = True
         ) -> None:
+        assert train_summary or test_summary
+
         with tf.name_scope(name_scope):
-            energy = energy_distance_bootstrap(
-                                        self._generator_output,
-                                        self._Y,
-                                        self._W,
-                                        n_samples
-                                    )
-            self.summary_energy = tf.summary.histogram(name, energy)
+            if projection_func is None:
+                test, ref = (self._generator_output_XY, self._XY)
+            else:
+                test, ref = (
+                        projection_func(self._X, self._generator_output),
+                        projection_func(self._X, self._Y)
+                    )
+
+            energy = energy_distance_bootstrap(test, ref, self._W, n_samples)
+            summary_energy = tf.summary.histogram(name, energy)
+
+            if train_summary:
+                self.train_summaries.append(summary_energy)
+            if test_summary:
+                self.test_summaries.append(summary_energy)
