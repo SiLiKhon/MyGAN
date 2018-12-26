@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from . import dataset as mds
 from . import tf_monitoring as tfmon
-from .metric import energy_distance_bootstrap
+from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
 class MyGAN:
     """
@@ -223,3 +223,30 @@ class MyGAN:
                 self.train_summaries.append(summary_energy)
             if test_summary:
                 self.test_summaries.append(summary_energy)
+
+    def make_summary_sliced_looped_ks(
+            self,
+            name: str,
+            name_scope: str = 'Monitoring/',
+            n_samples: int = 10,
+            n_loops: int = 10,
+            train_summary: bool = True,
+            test_summary: bool = True
+        ) -> None:
+        assert train_summary or test_summary
+
+        with tf.name_scope(name_scope):
+            ks_statistic = sliced_ks_in_loops(
+                    self._generator_output_XY,
+                    self._XY,
+                    self._W,
+                    self._W,
+                    n_samples=n_samples,
+                    n_loops=n_loops
+                )
+            summary_ks = tf.summary.scalar(name, ks_statistic)
+
+            if train_summary:
+                self.train_summaries.append(summary_ks)
+            if test_summary:
+                self.test_summaries.append(summary_ks)

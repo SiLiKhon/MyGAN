@@ -83,6 +83,8 @@ for i in range(3):
 gan.make_summary_energy(name='energy_distance_Y2_minus_Y01mean',
                         projection_func=lambda X, Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1))
 
+gan.make_summary_sliced_looped_ks(name='sliced_ks')
+
 train_summary = tf.summary.merge(gan.train_summaries)
 val_summary   = tf.summary.merge(gan.test_summaries)
 
