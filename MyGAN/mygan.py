@@ -8,7 +8,7 @@ import tensorflow as tf
 
 from . import dataset as mds
 from . import tf_monitoring as tfmon
-from .metric import energy_distance_bootstrap
+from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
 class MyGAN:
     """
@@ -54,6 +54,8 @@ class MyGAN:
 
         self.train_summaries: List[tf.Tensor] = []
         self.test_summaries: List[tf.Tensor] = []
+
+        self.summaries_finalized = False
 
     def build_graph(
             self,
@@ -170,14 +172,27 @@ class MyGAN:
     def get_disc_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.disc_scope)
 
+    def get_merged_summaries(self) -> Tuple[tf.Tensor, tf.Tensor]:
+        if not self.summaries_finalized:
+            with tf.control_dependencies(self.train_summaries + self.test_summaries):
+                close_all_figs_op = tfmon.close_all_figures_op()
+                with tf.control_dependencies([close_all_figs_op]):
+                    self.train_summary = tf.summary.merge(self.train_summaries)
+                    self.val_summary   = tf.summary.merge(self.test_summaries)
+            self.summaries_finalized = True
+
+        return self.train_summary, self.val_summary
+
     def make_summary_histogram(
             self,
             name: str,
             func: Callable[[tf.Tensor], tf.Tensor],
             name_scope: str = 'Monitoring/',
             train_summary: bool = False,
-            test_summary: bool = True
+            test_summary: bool = True,
+            autoclose_figure: bool = False 
         ) -> None:
+        assert not self.summaries_finalized
         assert train_summary or test_summary
 
         with tf.name_scope(name_scope):
@@ -188,7 +203,8 @@ class MyGAN:
                                         reference=func(self._Y),
                                         reference_w=self._W,
                                         label='Generated',
-                                        label_ref='Real'
+                                        label_ref='Real',
+                                        close_fig=autoclose_figure
                                     )
             if train_summary:
                 self.train_summaries.append(hist_summary)
@@ -205,6 +221,7 @@ class MyGAN:
             train_summary: bool = False,
             test_summary: bool = True
         ) -> None:
+        assert not self.summaries_finalized
         assert train_summary or test_summary
 
         with tf.name_scope(name_scope):
@@ -223,3 +240,31 @@ class MyGAN:
                 self.train_summaries.append(summary_energy)
             if test_summary:
                 self.test_summaries.append(summary_energy)
+
+    def make_summary_sliced_looped_ks(
+            self,
+            name: str,
+            name_scope: str = 'Monitoring/',
+            n_samples: int = 10,
+            n_loops: int = 10,
+            train_summary: bool = True,
+            test_summary: bool = True
+        ) -> None:
+        assert not self.summaries_finalized
+        assert train_summary or test_summary
+
+        with tf.name_scope(name_scope):
+            ks_statistic = sliced_ks_in_loops(
+                    self._generator_output_XY,
+                    self._XY,
+                    self._W,
+                    self._W,
+                    n_samples=n_samples,
+                    n_loops=n_loops
+                )
+            summary_ks = tf.summary.scalar(name, ks_statistic)
+
+            if train_summary:
+                self.train_summaries.append(summary_ks)
+            if test_summary:
+                self.test_summaries.append(summary_ks)

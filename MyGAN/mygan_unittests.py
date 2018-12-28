@@ -36,8 +36,7 @@ class UnitTestsMyGan(unittest.TestCase):
         gan.make_summary_histogram('Y0', lambda Y: Y[:,0])
         gan.make_summary_energy(name='energy_distance_full')
 
-        train_summary = tf.summary.merge(gan.train_summaries)
-        val_summary   = tf.summary.merge(gan.test_summaries)
+        train_summary, val_summary = gan.get_merged_summaries()
 
         summary_path = os.path.join(self.temp_directory, "test_basic")
         print("Summary path is: {}".format(summary_path))

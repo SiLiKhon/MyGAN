@@ -1,0 +1,3 @@
+[submodule "MyGAN/weighted_ks"]
+	path = MyGAN/weighted_ks
+	url = https://github.com/SiLiKhon/weighted_ks.git

@@ -1,7 +1,7 @@
 import os
 
 os.environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES']='1'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 
 import os.path
 import time
@@ -14,6 +14,9 @@ from MyGAN.cramer_gan import CramerGAN
 from MyGAN import tf_monitoring as tfmon
 from MyGAN.nns import deep_wide_generator, deep_wide_discriminator, noise_layer
 from MyGAN.train_utils import adversarial_train_op_func, create_mode
+
+gpu_options = tf.GPUOptions(allow_growth=True)
+tf_config = tf.ConfigProto(gpu_options=gpu_options)
 
 tf.reset_default_graph()
 
@@ -83,8 +86,9 @@ for i in range(3):
 gan.make_summary_energy(name='energy_distance_Y2_minus_Y01mean',
                         projection_func=lambda X, Y: Y[:,2] - tf.reduce_mean(Y[:,:2], axis=1))
 
-train_summary = tf.summary.merge(gan.train_summaries)
-val_summary   = tf.summary.merge(gan.test_summaries)
+gan.make_summary_sliced_looped_ks(name='sliced_ks')
+
+train_summary, val_summary = gan.get_merged_summaries()
 
 print("Summary path is: {}".format(summary_path))
 summary_path_train = os.path.join(summary_path, 'train')
@@ -103,7 +107,7 @@ summary_writer_test = tf.summary.FileWriter(
                                     )
 weights_saver = tf.train.Saver(keep_checkpoint_every_n_hours=keep_checkpoint_every_n_hours)
 
-with tf.Session() as sess:
+with tf.Session(config=tf_config) as sess:
     latest_ckpt = tf.train.latest_checkpoint(weights_dir)
 
     if latest_ckpt is None:
