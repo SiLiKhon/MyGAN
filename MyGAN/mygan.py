@@ -3,6 +3,7 @@ GAN base class
 """
 
 from typing import Callable, Tuple, List, Optional
+import contextlib
 
 import tensorflow as tf
 
@@ -56,6 +57,8 @@ class MyGAN:
         self.test_summaries: List[tf.Tensor] = []
 
         self.summaries_finalized = False
+        self._has_train_hist_summary = False
+        self._has_test_hist_summary = False
 
     def build_graph(
             self,
@@ -174,11 +177,18 @@ class MyGAN:
 
     def get_merged_summaries(self) -> Tuple[tf.Tensor, tf.Tensor]:
         if not self.summaries_finalized:
-            with tf.control_dependencies(self.train_summaries + self.test_summaries):
-                close_all_figs_op = tfmon.close_all_figures_op()
-                with tf.control_dependencies([close_all_figs_op]):
-                    self.train_summary = tf.summary.merge(self.train_summaries)
-                    self.val_summary   = tf.summary.merge(self.test_summaries)
+            with contextlib.ExitStack() as stack:
+                dependencies: List[tf.Tensor] = []
+                if self._has_test_hist_summary:
+                    dependencies += self.test_summaries
+                if self._has_train_hist_summary:
+                    dependencies += self.train_summaries
+                if dependencies:
+                    stack.enter_context(tf.control_dependencies(dependencies))
+                    close_all_figs_op = tfmon.close_all_figures_op()
+                    stack.enter_context(tf.control_dependencies([close_all_figs_op]))
+                self.train_summary = tf.summary.merge(self.train_summaries)
+                self.val_summary   = tf.summary.merge(self.test_summaries)
             self.summaries_finalized = True
 
         return self.train_summary, self.val_summary
@@ -208,8 +218,10 @@ class MyGAN:
                                     )
             if train_summary:
                 self.train_summaries.append(hist_summary)
+                self._has_train_hist_summary = True
             if test_summary:
                 self.test_summaries.append(hist_summary)
+                self._has_test_hist_summary = True
 
 
     def make_summary_energy(
