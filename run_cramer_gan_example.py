@@ -88,8 +88,7 @@ gan.make_summary_energy(name='energy_distance_Y2_minus_Y01mean',
 
 gan.make_summary_sliced_looped_ks(name='sliced_ks')
 
-train_summary = tf.summary.merge(gan.train_summaries)
-val_summary   = tf.summary.merge(gan.test_summaries)
+train_summary, val_summary = gan.get_merged_summaries()
 
 print("Summary path is: {}".format(summary_path))
 summary_path_train = os.path.join(summary_path, 'train')

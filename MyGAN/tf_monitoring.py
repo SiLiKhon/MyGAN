@@ -23,7 +23,8 @@ def make_histogram(
         label: str = '',
         label_ref: str = '',
         alpha: float = 0.7,
-        figsize: Tuple[float, float] = (7., 7.)
+        figsize: Tuple[float, float] = (7., 7.),
+        close_fig: bool = True
     ) -> tf.Tensor:
     if (label_ref is not None) or (reference_w is not None):
         assert reference is not None, "Reference label/weights given, but reference is None"
@@ -45,7 +46,8 @@ def make_histogram(
 
         buf = io.BytesIO()
         fig.savefig(buf, format='png')
-        plt.close(fig)
+        if close_fig:
+            plt.close(fig)
         buf.seek(0)
 
         img = PIL.Image.open(buf)
@@ -61,3 +63,9 @@ def make_histogram(
             reference_w = tf.ones(dtype=reference.dtype, shape=tf.shape(reference)[0])
         fig = tf.py_func(_array_to_hist_img, [input, input_w, reference, reference_w], tf.uint8)
     return tf.summary.image(summary_name, fig)
+
+def close_all_figures_op() -> tf.Tensor:
+    def _close_all() -> np.ndarray:
+        plt.close('all')
+        return np.zeros(shape=[1], dtype=np.uint8)
+    return tf.py_func(_close_all, [], tf.uint8)
