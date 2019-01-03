@@ -119,13 +119,22 @@ with tf.Session(config=tf_config) as sess:
         last_time = time.time()
 
     try:
+        last_validation_time = 0.0
         while True:
             _, summary, i = sess.run([gan.train_op, train_summary, global_step])
             summary_writer_train.add_summary(summary, i)
             if i % validation_interval_steps == 0:
+                cur_validation_time = time.time()
                 summary = sess.run(val_summary, {gan.mode : 'test'})
                 summary_writer_test.add_summary(summary, i)
-                print("step {}".format(i))
+                printouts = ["step {}".format(i)]
+                if last_validation_time > 0:
+                    validation_time_delta = cur_validation_time - last_validation_time
+                    printouts.append(
+                            "time elapsed since last val: {:.2f} secs".format(validation_time_delta)
+                        )
+                last_validation_time = cur_validation_time
+                print(", ".join(printouts))
             cur_time = time.time()
             if cur_time - last_time >= save_interval_secs:
                 last_time = cur_time
