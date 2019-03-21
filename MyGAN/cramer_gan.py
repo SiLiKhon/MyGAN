@@ -16,7 +16,7 @@ class CramerGAN(MyGAN):
     """
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor, int], tf.Tensor],
+            generator_func: Callable[[tf.Tensor], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
@@ -104,10 +104,10 @@ class CramerGAN(MyGAN):
 
             return gen_loss, disc_loss
 
-def cramer_gan() -> CramerGAN:
+def cramer_gan(num_target_features: int) -> CramerGAN:
     """Build a CramerGAN with default architecture"""
     return CramerGAN(
-        generator_func=deep_wide_generator,
+        generator_func=lambda X: deep_wide_generator(X, num_target_features),
         discriminator_func=deep_wide_discriminator,
         train_op_func=adversarial_train_op_func
     )
