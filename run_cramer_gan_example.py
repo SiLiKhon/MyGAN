@@ -44,8 +44,8 @@ step_op = tf.assign_add(global_step, 1)
 
 mode = create_mode()
 gan = CramerGAN(
-            generator_func=lambda x, ny: deep_wide_generator(
-                                x, ny,
+            generator_func=lambda x: deep_wide_generator(
+                                x, Y.shape[1],
                                 depth=7,
                                 width=64
                             ),
@@ -69,8 +69,15 @@ ds = mds.Dataset(
 )
 
 ds_train, ds_test = ds.split(test_size=0.02)
-
-gan.build_graph(ds_train, ds_test, batch_size, mode)
+X_train, Y_train, W_train = ds_train.get_tf(
+    batch_size=batch_size, cols=['X', 'Y', 'W']
+)
+X_test, Y_test, W_test = ds_test.get_tf(
+    batch_size=len(ds_test), cols=['X', 'Y', 'W'], make_tf_ds=False
+)
+gan.build_graph(X_train=X_train, Y_train=Y_train,
+                X_test=X_test, Y_test=Y_test, mode=mode,
+                W_train=W_train, W_test=W_test)
 
 for i in range(3):
     gan.make_summary_histogram("Y{}".format(i), lambda Y: Y[:,i])

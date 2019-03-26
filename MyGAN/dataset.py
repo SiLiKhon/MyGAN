@@ -152,7 +152,7 @@ class Dataset:
         """
 
         if make_tf_ds:
-            shuffler = tf.contrib.data.shuffle_and_repeat(self.data.shape[0], seed=seed)
+            shuffler = tf.data.experimental.shuffle_and_repeat(self.data.shape[0], seed=seed)
             shuffled_ds = shuffler(tf.data.Dataset.from_tensor_slices(self.data))
             full_tensor = shuffled_ds.batch(batch_size).make_one_shot_iterator().get_next()
         else:

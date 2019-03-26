@@ -7,7 +7,6 @@ import contextlib
 
 import tensorflow as tf
 
-from . import dataset as mds
 from . import tf_monitoring as tfmon
 from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
@@ -18,7 +17,7 @@ class MyGAN:
 
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor, int], tf.Tensor],
+            generator_func: Callable[[tf.Tensor], tf.Tensor],
             discriminator_func: Callable[[tf.Tensor], tf.Tensor],
             losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, Optional[tf.Tensor]], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
@@ -29,7 +28,7 @@ class MyGAN:
         Arguments:
 
         generator_func -- function to build the generator. Should follow the signature:
-            generator_func(input_X_tensor, num_output_features) -> output_Y_gen_tensor.
+            generator_func(input_X_tensor) -> output_Y_gen_tensor.
             All the tf variables should follow the tf.get_variable paradigm to allow for
             weights reuse.
         discriminator_func -- function to build the discriminator. Should follow the
@@ -62,53 +61,55 @@ class MyGAN:
 
     def build_graph(
             self,
-            train_ds: mds.Dataset,
-            test_ds: mds.Dataset,
-            batch_size: int,
+            X_train: tf.Tensor,
+            Y_train: tf.Tensor,
+            X_test: tf.Tensor,
+            Y_test: tf.Tensor,
             mode: tf.Tensor,
-            seed: Optional[int] = None,
-            noise_std: Optional[float] = None
+            W_train: Optional[tf.Tensor] = None,
+            W_test: Optional[tf.Tensor] = None,
         ) -> None:
         """
         Build the graph.
 
         Arguments:
 
-        train_ds -- MyGAN.dataset.Dataset object with data to train on.
-        test_ds -- MyGAN.dataset.Dataset object with data to test on.
-        batch_size -- batch size.
+        X_train -- tensor with input variables to train on.
+        Y_train -- tensor with target variables to train on.
+        X_test -- tensor with input variables to test on.
+        Y_test -- tensor with target variables to test on.
         mode -- tensor evaluating to either 'train' or 'test' string.
-        seed -- random seed to be used for dataset shuffling, optional.
-        noise_std -- standard deviation of noise to be added to data (both X and Y), optional.
         """
-
-        assert train_ds.check_similar(test_ds)
 
         self.mode = mode
 
-        self._train_ds = train_ds
-        self._test_ds = test_ds
-        self._weighted = (train_ds.W is not None)
-        cols = ['X', 'Y', 'XY']
-        if self._weighted:
-            cols += 'W'
+        assert (W_train is None) == (W_test is None), \
+            "Both W_train and W_test should be either provided or omitted"
+
+        self._weighted = (W_train is not None)
 
         with tf.name_scope('Inputs'):
             with tf.name_scope('Train'):
-                tf_inputs = train_ds.get_tf(
-                                batch_size=batch_size,
-                                cols=cols,
-                                seed=seed,
-                                noise_std=noise_std
-                            )
+                tf_inputs = [
+                    tf.identity(X_train, 'X'),
+                    tf.identity(Y_train, 'Y'),
+                    tf.concat([X_train, Y_train], axis=1, name='XY'),
+                ]
+                if self._weighted:
+                    tf_inputs.append(
+                        tf.identity(W_train, 'W')
+                    )
 
             with tf.name_scope('Test'):
-                tf_inputs_test = test_ds.get_tf(
-                                     batch_size=len(test_ds),
-                                     cols=cols,
-                                     make_tf_ds=False
-                                 )
-
+                tf_inputs_test = [
+                    tf.identity(X_test, 'X'),
+                    tf.identity(Y_test, 'Y'),
+                    tf.concat([X_test, Y_test], axis=1, name='XY'),
+                ]
+                if self._weighted:
+                    tf_inputs_test.append(
+                        tf.identity(W_test, 'W')
+                    )
 
             self._X, self._Y, self._XY = tf.case(
                     {
@@ -129,7 +130,7 @@ class MyGAN:
                     )
 
         with tf.variable_scope(self.gen_scope):
-            self._generator_output = self.generator_func(self._X, train_ds.ny)
+            self._generator_output = self.generator_func(self._X)
             self._generator_output_XY = tf.concat([self._X, self._generator_output], axis=1)
 
         with tf.variable_scope(self.disc_scope):

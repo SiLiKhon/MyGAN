@@ -23,7 +23,7 @@ class UnitTestsMyGan(unittest.TestCase):
         Y2  = Y01.sum(axis=1).reshape((-1, 1)) / 2 + \
                 np.random.normal(loc=0.0, scale=0.01, size=(N, 1)).astype(np.float32)
         Y = np.concatenate([Y01, Y2], axis=1)
-        gan = cramer_gan()
+        gan = cramer_gan(num_target_features=Y.shape[1])
         ds = mds.Dataset(
             X=np.ones(shape=(N, 1), dtype=np.float32),
             Y=Y
@@ -32,7 +32,16 @@ class UnitTestsMyGan(unittest.TestCase):
         print((len(ds_train), len(ds_test)))
 
         mode = create_mode()
-        gan.build_graph(ds_train, ds_test, 10000, mode)
+        X_train, Y_train = ds_train.get_tf(
+            batch_size=10000, cols=['X', 'Y']
+        )
+        X_test, Y_test = ds_test.get_tf(
+            batch_size=len(ds_test), cols=['X', 'Y'], make_tf_ds=False
+        )
+        gan.build_graph(
+            X_train=X_train, Y_train=Y_train,
+            X_test=X_test, Y_test=Y_test, mode=mode
+        )
         gan.make_summary_histogram('Y0', lambda Y: Y[:,0])
         gan.make_summary_energy(name='energy_distance_full')
 
