@@ -11,7 +11,6 @@ import tensorflow as tf
 
 from MyGAN import dataset as mds
 from MyGAN.cramer_gan import CramerGAN
-from MyGAN import tf_monitoring as tfmon
 from MyGAN.nns import deep_wide_generator, deep_wide_discriminator, noise_layer
 from MyGAN.train_utils import adversarial_train_op_func, create_mode
 

@@ -2,7 +2,6 @@
 Useful functions for tensorboard monitoring.
 """
 
-import os
 import io
 from typing import Optional, Tuple
 
