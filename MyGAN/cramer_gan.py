@@ -6,18 +6,18 @@ from typing import Callable, Optional, Tuple, List, Union
 
 import tensorflow as tf
 
-from .mygan import MyGAN
+from .mygan import MyGAN, TIn, TOut
 from .nns import deep_wide_generator, deep_wide_discriminator
 from .train_utils import adversarial_train_op_func
 
-class CramerGAN(MyGAN):
+class CramerGAN(MyGAN[TIn, TOut]):
     """
     GAN with Cramer metric
     """
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor], tf.Tensor],
-            discriminator_func: Callable[[tf.Tensor], tf.Tensor],
+            generator_func: Callable[[TIn], TOut],
+            discriminator_func: Callable[[TIn, TOut], tf.Tensor],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = ''
@@ -37,8 +37,8 @@ class CramerGAN(MyGAN):
                 generator_func,
                 discriminator_func,
                 lambda gen, real, inter, w: self._losses_func(gen, real, inter, w,
-                                                           gp_factor=gp_factor,
-                                                           gp_mode=gp_mode),
+                                                              gp_factor=gp_factor,
+                                                              gp_mode=gp_mode),
                 train_op_func
             )
 
@@ -108,6 +108,8 @@ def cramer_gan(num_target_features: int) -> CramerGAN:
     """Build a CramerGAN with default architecture"""
     return CramerGAN(
         generator_func=lambda X: deep_wide_generator(X, num_target_features),
-        discriminator_func=deep_wide_discriminator,
+        discriminator_func=lambda X, Y: deep_wide_discriminator(
+            tf.concat([X, Y], axis=1)
+        ),
         train_op_func=adversarial_train_op_func
     )

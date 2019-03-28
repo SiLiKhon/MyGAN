@@ -42,17 +42,19 @@ global_step = tf.train.get_or_create_global_step()
 step_op = tf.assign_add(global_step, 1)
 
 mode = create_mode()
+generator_func = lambda x: deep_wide_generator(
+                      x, Y.shape[1],
+                      depth=7,
+                      width=64
+                  )
+discriminator_func = lambda x, y: deep_wide_discriminator(
+                      noise_layer(tf.concat([x, y], axis=1), 0.005, mode),
+                      depth=7,
+                      width=64
+                  )
 gan = CramerGAN(
-            generator_func=lambda x: deep_wide_generator(
-                                x, Y.shape[1],
-                                depth=7,
-                                width=64
-                            ),
-            discriminator_func=lambda x: deep_wide_discriminator(
-                                noise_layer(x, 0.005, mode),
-                                depth=7,
-                                width=64
-                            ),
+            generator_func=generator_func,
+            discriminator_func=discriminator_func,
             train_op_func=lambda gloss, dloss, gvars, dvars: adversarial_train_op_func(
                                 gloss, dloss, gvars, dvars,
                                 optimizer=tf.train.RMSPropOptimizer(0.00001)
