@@ -124,7 +124,7 @@ class MyGAN(Generic[TIn, TOut]):
                 )
 
         with tf.variable_scope(self.disc_scope, reuse=True):
-            alpha = tf.random_uniform(shape=[tf.shape(self._X)[0], 1], minval=0., maxval=1.)
+            alpha = tf.random_uniform(shape=[tf.shape(self._X)[0], 1], minval=0., maxval=1., dtype=self._X.dtype)
             interpolates = (
                     alpha * self._Y
                   + (1 - alpha) * self._generator_output
