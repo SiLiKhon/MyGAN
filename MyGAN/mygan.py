@@ -2,7 +2,7 @@
 GAN base class
 """
 
-from typing import Callable, Tuple, List, Optional
+from typing import Callable, Tuple, List, Optional, TypeVar, Generic
 import contextlib
 
 import tensorflow as tf
@@ -10,15 +10,18 @@ import tensorflow as tf
 from . import tf_monitoring as tfmon
 from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
-class MyGAN:
+TIn  = TypeVar("TIn")
+TOut = TypeVar("TOut")
+
+class MyGAN(Generic[TIn, TOut]):
     """
     Base class for GANs
     """
 
     def __init__(
             self,
-            generator_func: Callable[[tf.Tensor], tf.Tensor],
-            discriminator_func: Callable[[tf.Tensor], tf.Tensor],
+            generator_func: Callable[[TIn], TOut],
+            discriminator_func: Callable[[TIn, TOut], tf.Tensor],
             losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, Optional[tf.Tensor]], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
         ) -> None:
@@ -28,17 +31,15 @@ class MyGAN:
         Arguments:
 
         generator_func -- function to build the generator. Should follow the signature:
-            generator_func(input_X_tensor) -> output_Y_gen_tensor.
-            All the tf variables should follow the tf.get_variable paradigm to allow for
-            weights reuse.
+            generator_func(X) -> Y_gen. All the tf variables should follow the
+            tf.get_variable paradigm to allow for weights reuse.
         discriminator_func -- function to build the discriminator. Should follow the
-            signature: discriminator_func(input_XY_tensor) -> output_tensor. All the tf
-            variables should follow the tf.get_variable paradigm to allow for weights
-            reuse.
+            signature: discriminator_func(X, Y) -> output_tensor. All the tf variables
+            should follow the tf.get_variable paradigm to allow for weights reuse.
         losses_func -- function to construct losses from discriminator outputs on generated
             samples, real samples and their linear interpolates (for gradient penalty):
-            losses_func(discriminator(generated_samples), discriminator(real_samples),
-            discriminator(interpolates), weights) -> (generator_loss, discriminator_loss)
+            losses_func(discriminator(X, Y_gen), discriminator(X, Y_real),
+            discriminator(X, Y_interp), weights) -> (generator_loss, discriminator_loss)
         train_op_func -- function to build the training operation:
             train_op_func(generator_loss, discriminator_loss, generator_weights,
             discriminator_weights) -> training_operation.
@@ -61,10 +62,10 @@ class MyGAN:
 
     def build_graph(
             self,
-            X_train: tf.Tensor,
-            Y_train: tf.Tensor,
-            X_test: tf.Tensor,
-            Y_test: tf.Tensor,
+            X_train: TIn,
+            Y_train: TOut,
+            X_test: TIn,
+            Y_test: TOut,
             mode: tf.Tensor,
             W_train: Optional[tf.Tensor] = None,
             W_test: Optional[tf.Tensor] = None,
@@ -74,11 +75,13 @@ class MyGAN:
 
         Arguments:
 
-        X_train -- tensor with input variables to train on.
-        Y_train -- tensor with target variables to train on.
-        X_test -- tensor with input variables to test on.
-        Y_test -- tensor with target variables to test on.
+        X_train -- input to train on.
+        Y_train -- output (target) to train on.
+        X_test -- input to test on.
+        Y_test -- output (target) to test on.
         mode -- tensor evaluating to either 'train' or 'test' string.
+        W_train -- tensor with train sample weights (optional)
+        W_test -- tensor with test sample weights (optional)
         """
 
         self.mode = mode
@@ -89,65 +92,44 @@ class MyGAN:
         self._weighted = (W_train is not None)
 
         with tf.name_scope('Inputs'):
-            with tf.name_scope('Train'):
-                tf_inputs = [
-                    tf.identity(X_train, 'X'),
-                    tf.identity(Y_train, 'Y'),
-                    tf.concat([X_train, Y_train], axis=1, name='XY'),
-                ]
-                if self._weighted:
-                    tf_inputs.append(
-                        tf.identity(W_train, 'W')
-                    )
-
-            with tf.name_scope('Test'):
-                tf_inputs_test = [
-                    tf.identity(X_test, 'X'),
-                    tf.identity(Y_test, 'Y'),
-                    tf.concat([X_test, Y_test], axis=1, name='XY'),
-                ]
-                if self._weighted:
-                    tf_inputs_test.append(
-                        tf.identity(W_test, 'W')
-                    )
-
-            self._X, self._Y, self._XY = tf.case(
+            self._X, self._Y = tf.case(
                     {
-                        tf.equal(self.mode, 'train') : lambda: tf_inputs     [:3],
-                        tf.equal(self.mode, 'test' ) : lambda: tf_inputs_test[:3]
+                        tf.equal(self.mode, 'train') : lambda: [X_train, Y_train],
+                        tf.equal(self.mode, 'test' ) : lambda: [X_test , Y_test ],
                     },
                     exclusive=True
                 )
+            self._XY = (self._X, self._Y)
             
             self._W = None
             if self._weighted:
                 self._W = tf.case(
                         {
-                            tf.equal(self.mode, 'train') : lambda: tf_inputs     [3],
-                            tf.equal(self.mode, 'test' ) : lambda: tf_inputs_test[3]
+                            tf.equal(self.mode, 'train') : lambda: W_train,
+                            tf.equal(self.mode, 'test' ) : lambda: W_test ,
                         },
                         exclusive=True
                     )
 
         with tf.variable_scope(self.gen_scope):
             self._generator_output = self.generator_func(self._X)
-            self._generator_output_XY = tf.concat([self._X, self._generator_output], axis=1)
+            self._generator_output_XY = (self._X, self._generator_output)
 
         with tf.variable_scope(self.disc_scope):
-            self._discriminator_output_real = self.discriminator_func(self._XY)
+            self._discriminator_output_real = self.discriminator_func(*self._XY)
 
         with tf.variable_scope(self.disc_scope, reuse=True):
             self._discriminator_output_gen  = self.discriminator_func(
-                    self._generator_output_XY
+                    *self._generator_output_XY
                 )
 
         with tf.variable_scope(self.disc_scope, reuse=True):
-            alpha = tf.random_uniform(shape=[tf.shape(self._XY)[0], 1], minval=0., maxval=1.)
+            alpha = tf.random_uniform(shape=[tf.shape(self._X)[0], 1], minval=0., maxval=1.)
             interpolates = (
-                    alpha * self._XY
-                  + (1 - alpha) * self._generator_output_XY
+                    alpha * self._Y
+                  + (1 - alpha) * self._generator_output
                 )
-            self._discriminator_output_int = self.discriminator_func(interpolates)
+            self._discriminator_output_int = self.discriminator_func(self._X, interpolates)
 
         with tf.name_scope("Training"):
             self._gen_loss, self._disc_loss = self.losses_func(
@@ -197,7 +179,7 @@ class MyGAN:
     def make_summary_histogram(
             self,
             name: str,
-            func: Callable[[tf.Tensor], tf.Tensor],
+            func: Callable[[TOut], tf.Tensor],
             name_scope: str = 'Monitoring/',
             train_summary: bool = False,
             test_summary: bool = True,
@@ -230,7 +212,7 @@ class MyGAN:
     def make_summary_energy(
             self,
             name: str,
-            projection_func: Optional[Callable[[tf.Tensor, tf.Tensor], tf.Tensor]] = None,
+            projection_func: Callable[[TIn, TOut], tf.Tensor] = lambda X, Y: tf.concat([X, Y], axis=1),
             name_scope: str = 'Monitoring/',
             n_samples: int = 100,
             train_summary: bool = False,
@@ -240,13 +222,10 @@ class MyGAN:
         assert train_summary or test_summary
 
         with tf.name_scope(name_scope):
-            if projection_func is None:
-                test, ref = (self._generator_output_XY, self._XY)
-            else:
-                test, ref = (
-                        projection_func(self._X, self._generator_output),
-                        projection_func(self._X, self._Y)
-                    )
+            test, ref = (
+                    projection_func(*self._generator_output_XY),
+                    projection_func(*self._XY)
+                )
 
             energy = energy_distance_bootstrap(test, ref, self._W, n_samples)
             summary_energy = tf.summary.histogram(name, energy)
@@ -259,6 +238,7 @@ class MyGAN:
     def make_summary_sliced_looped_ks(
             self,
             name: str,
+            projection_func: Callable[[TIn, TOut], tf.Tensor] = lambda X, Y: tf.concat([X, Y], axis=1),
             name_scope: str = 'Monitoring/',
             n_samples: int = 10,
             n_loops: int = 10,
@@ -270,8 +250,8 @@ class MyGAN:
 
         with tf.name_scope(name_scope):
             ks_statistic = sliced_ks_in_loops(
-                    self._generator_output_XY,
-                    self._XY,
+                    projection_func(*self._generator_output_XY),
+                    projection_func(*self._XY),
                     self._W,
                     self._W,
                     n_samples=n_samples,
