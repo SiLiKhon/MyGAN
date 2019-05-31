@@ -14,6 +14,8 @@ class CramerGAN(MyGAN[TIn, TOut]):
     """
     GAN with Cramer metric
     """
+    epsilon = 1e-9
+
     def __init__(
             self,
             generator_func: Callable[[TIn], TOut],
@@ -42,6 +44,7 @@ class CramerGAN(MyGAN[TIn, TOut]):
                 train_op_func
             )
 
+
     @staticmethod
     def _losses_func(
             disc_output_gen: tf.Tensor,
@@ -52,6 +55,7 @@ class CramerGAN(MyGAN[TIn, TOut]):
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
         ) -> Tuple[tf.Tensor, tf.Tensor]:
+        eps = CramerGAN.epsilon
         with tf.name_scope(name, "Losses"):
             if weights is None:
                 weights = tf.ones(shape=[tf.shape(disc_output_gen)[0]])
@@ -63,10 +67,10 @@ class CramerGAN(MyGAN[TIn, TOut]):
 
             with tf.name_scope("generator_loss"):
                 gen_loss = (
-                        tf.reduce_sum(tf.norm(real1 - gen1 , axis=1) * w1     , axis=0) / tf.reduce_sum(w1     , axis=0)
-                      + tf.reduce_sum(tf.norm(real2 - gen2 , axis=1) * w2     , axis=0) / tf.reduce_sum(w2     , axis=0)
-                      - tf.reduce_sum(tf.norm(gen1  - gen2 , axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
-                      - tf.reduce_sum(tf.norm(real1 - real2, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
+                        tf.reduce_sum(tf.norm(real1 - gen1  + eps, axis=1) * w1     , axis=0) / tf.reduce_sum(w1     , axis=0)
+                      + tf.reduce_sum(tf.norm(real2 - gen2  + eps, axis=1) * w2     , axis=0) / tf.reduce_sum(w2     , axis=0)
+                      - tf.reduce_sum(tf.norm(gen1  - gen2  + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
+                      - tf.reduce_sum(tf.norm(real1 - real2 + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
                     )
                 gen_loss = tf.identity(gen_loss, name='gen_loss')
 
@@ -74,21 +78,21 @@ class CramerGAN(MyGAN[TIn, TOut]):
                 with tf.name_scope("gradient_penalty"):
                     if gp_mode == 'wgan_gp_one_sided':
                         critic_int = (
-                                tf.norm(int1 - gen2 , axis=1)
-                              - tf.norm(int1 - real2, axis=1)
+                                tf.norm(int1 - gen2  + eps, axis=1)
+                              - tf.norm(int1 - real2 + eps, axis=1)
                             )
         
                         gradients = tf.gradients(critic_int, [int1])[0]
-                        slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]), axis=1)
+                        slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_mean(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
                     elif gp_mode == 'zero_data_only':
                         critic_data = (
-                                tf.norm(real1 - gen2 , axis=1)
-                              - tf.norm(real1 - real2, axis=1)
+                                tf.norm(real1 - gen2  + eps, axis=1)
+                              - tf.norm(real1 - real2 + eps, axis=1)
                             )
                         gradients = tf.gradients(critic_data, [real1])[0]
-                        slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]), axis=1)
+                        slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_sum(tf.square(slopes) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
                     else:

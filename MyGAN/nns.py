@@ -10,6 +10,7 @@ def get_dense(
         input: tf.Tensor,
         widths: List[int],
         activations: List[Optional[Callable[[tf.Tensor], tf.Tensor]]],
+        kernel_initializer: tf.keras.initializers.Initializer = tf.initializers.variance_scaling(scale=2.),
         name: str = "dense"
     ) -> tf.Tensor:
     """
@@ -32,6 +33,7 @@ def get_dense(
                 output,
                 units=w,
                 activation=a,
+                kernel_initializer=kernel_initializer,
                 name="{}_{}".format(name, i)
             )
     return output
@@ -41,7 +43,8 @@ def deep_wide_generator(
         n_out: int,
         n_latent: int = 32,
         depth: int = 7,
-        width: int = 64
+        width: int = 64,
+        activation: Callable[[tf.Tensor], tf.Tensor] = tf.nn.relu
     ) -> tf.Tensor:
     """
     Build a generator of a simple dense NN structure.
@@ -53,20 +56,22 @@ def deep_wide_generator(
     n_latent -- latent space size, optional (default = 32).
     depth -- number of dense layers, optional (default = 7).
     width -- number of neurons per layer, optional (default = 64).
+    activation -- activation function for all but the last layer (default = tf.nn.relu).
     """
     noise = tf.random_normal([tf.shape(input)[0], n_latent], dtype=input.dtype)
     input = tf.concat([noise, input], axis=1)
     return get_dense(
             input,
             [width      for _ in range(depth - 1)] + [n_out],
-            [tf.nn.relu for _ in range(depth - 1)] + [None]
+            [activation for _ in range(depth - 1)] + [None]
         )
 
 def deep_wide_discriminator(
         input: tf.Tensor,
         depth: int = 7,
         width: int = 64,
-        n_out: int = 128
+        n_out: int = 128,
+        activation: Callable[[tf.Tensor], tf.Tensor] = tf.nn.relu
     ) -> tf.Tensor:
     """
     Build a discriminator of a simple dense NN structure.
@@ -77,11 +82,12 @@ def deep_wide_discriminator(
     depth -- number of dense layers, optional (default = 7).
     width -- number of neurons per layer, optional (default = 64).
     n_out -- size of the output space, optional (default = 128).
+    activation -- activation function for all but the last layer (default = tf.nn.relu).
     """
     return get_dense(
             input,
             [width      for _ in range(depth - 1)] + [n_out],
-            [tf.nn.relu for _ in range(depth - 1)] + [None]
+            [activation for _ in range(depth - 1)] + [None]
         )
 
 def noise_layer(
