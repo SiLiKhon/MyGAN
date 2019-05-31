@@ -60,10 +60,12 @@ def deep_wide_generator(
     """
     noise = tf.random_normal([tf.shape(input)[0], n_latent], dtype=input.dtype)
     input = tf.concat([noise, input], axis=1)
+    activations = [activation for _ in range(depth - 1)] # type: List[Optional[Callable[[tf.Tensor], tf.Tensor]]]
+    activations += [None]
     return get_dense(
             input,
-            [width      for _ in range(depth - 1)] + [n_out],
-            [activation for _ in range(depth - 1)] + [None]
+            [width for _ in range(depth - 1)] + [n_out],
+            activations
         )
 
 def deep_wide_discriminator(
@@ -84,10 +86,12 @@ def deep_wide_discriminator(
     n_out -- size of the output space, optional (default = 128).
     activation -- activation function for all but the last layer (default = tf.nn.relu).
     """
+    activations = [activation for _ in range(depth - 1)] # type: List[Optional[Callable[[tf.Tensor], tf.Tensor]]]
+    activations += [None]
     return get_dense(
             input,
-            [width      for _ in range(depth - 1)] + [n_out],
-            [activation for _ in range(depth - 1)] + [None]
+            [width for _ in range(depth - 1)] + [n_out],
+            activations
         )
 
 def noise_layer(
