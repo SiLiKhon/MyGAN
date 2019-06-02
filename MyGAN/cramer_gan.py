@@ -87,13 +87,19 @@ class CramerGAN(MyGAN[TIn, TOut]):
                         penalty = tf.reduce_mean(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
                     elif gp_mode == 'zero_data_only':
+                        real11, real12 = tf.split(real1, 2, axis=0)
+                        real21, real22 = tf.split(real2, 2, axis=0)
+                        w11   , w12    = tf.split(w1   , 2, axis=0)
+                        w21   , w22    = tf.split(w2   , 2, axis=0)
                         critic_data = (
-                                tf.norm(real1 - gen2  + eps, axis=1)
-                              - tf.norm(real1 - real2 + eps, axis=1)
+                                tf.norm(real11 - real12 + eps, axis=1)
+                              + tf.norm(real21 - real22 + eps, axis=1)
+                              - tf.norm(real11 - real21 + eps, axis=1)
+                              - tf.norm(real12 - real22 + eps, axis=1)
                             )
-                        gradients = tf.gradients(critic_data, [real1])[0]
+                        gradients = tf.gradients(critic_data, [real11])[0]
                         slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
-                        penalty = tf.reduce_sum(tf.square(slopes) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
+                        penalty = tf.reduce_sum(tf.square(slopes) * w11 * w12 * w21 * w22, axis=0) / tf.reduce_sum(w11 * w12 * w21 * w22, axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
                     else:
                         raise NotImplementedError(gp_mode)
