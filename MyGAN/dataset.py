@@ -154,7 +154,10 @@ class Dataset:
         if make_tf_ds:
             shuffler = tf.data.experimental.shuffle_and_repeat(self.data.shape[0], seed=seed)
             shuffled_ds = shuffler(tf.data.Dataset.from_tensor_slices(self.data))
-            full_tensor = shuffled_ds.batch(batch_size).make_one_shot_iterator().get_next()
+            if tf.__version__ >= '1.13':
+                full_tensor = tf.compat.v1.data.make_one_shot_iterator(shuffled_ds.batch(batch_size)).get_next()
+            else:
+                full_tensor = shuffled_ds.batch(batch_size).make_one_shot_iterator().get_next()
         else:
             assert seed is None, "seed is not used when make_tf_ds=False"
             full_tensor = tf.placeholder_with_default(self.data[:batch_size], [None, self.data.shape[1]])
