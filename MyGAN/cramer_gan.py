@@ -22,7 +22,8 @@ class CramerGAN(MyGAN[TIn, TOut]):
             discriminator_func: Callable[[TIn, TOut], tf.Tensor],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
-            gp_mode: str = ''
+            gp_mode: str = '',
+            surrogate: bool = False
         ) -> None:
         """
         Arguments:
@@ -40,7 +41,8 @@ class CramerGAN(MyGAN[TIn, TOut]):
                 discriminator_func,
                 lambda gen, real, inter, w: self._losses_func(gen, real, inter, w,
                                                               gp_factor=gp_factor,
-                                                              gp_mode=gp_mode),
+                                                              gp_mode=gp_mode,
+                                                              surrogate=surrogate),
                 train_op_func
             )
 
@@ -54,6 +56,7 @@ class CramerGAN(MyGAN[TIn, TOut]):
             name: Optional[str] = None,
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
+            surrogate: bool = False
         ) -> Tuple[tf.Tensor, tf.Tensor]:
         eps = CramerGAN.epsilon
         with tf.name_scope(name, "Losses"):
@@ -64,14 +67,20 @@ class CramerGAN(MyGAN[TIn, TOut]):
             real1, real2 = tf.split(disc_output_real, 2, axis=0)
             int1 , _     = tf.split(disc_output_int , 2, axis=0)
             w1   , w2    = tf.split(weights         , 2, axis=0)
+            if surrogate:
+                real2 = tf.zeros_like(real1)
 
             with tf.name_scope("generator_loss"):
-                gen_loss = (
-                        tf.reduce_sum(tf.norm(real1 - gen1  + eps, axis=1) * w1     , axis=0) / tf.reduce_sum(w1     , axis=0)
-                      + tf.reduce_sum(tf.norm(real2 - gen2  + eps, axis=1) * w2     , axis=0) / tf.reduce_sum(w2     , axis=0)
-                      - tf.reduce_sum(tf.norm(gen1  - gen2  + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
-                      - tf.reduce_sum(tf.norm(real1 - real2 + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
-                    )
+                gen_loss = tf.reduce_sum(
+                        w1 * w2 * (
+                            tf.norm(real1 - gen2  + eps, axis=1)
+                          + tf.norm(real2 - gen1  + eps, axis=1)
+                          - tf.norm(gen1  - gen2  + eps, axis=1)
+                          - tf.norm(real1 - real2 + eps, axis=1)
+                        ),
+                        axis=0
+                    ) / tf.reduce_sum(w1 * w2, axis=0)
+        
                 gen_loss = tf.identity(gen_loss, name='gen_loss')
 
             if gp_factor is not None:
