@@ -10,7 +10,7 @@ from .mygan import MyGAN, TIn, TOut
 from .nns import deep_wide_generator, deep_wide_discriminator
 from .train_utils import adversarial_train_op_func
 
-class CramerGAN(MyGAN[TIn, TOut]):
+class CramerGAN(MyGAN):
     """
     GAN with Cramer metric
     """
@@ -36,7 +36,7 @@ class CramerGAN(MyGAN[TIn, TOut]):
 
         See MyGAN.__init__ docstring for other arguments.
         """
-        super().__init__(
+        super().__init__( # type: ignore
                 generator_func,
                 discriminator_func,
                 lambda gan: self._losses_func(gan,
@@ -140,10 +140,10 @@ class CramerGAN(MyGAN[TIn, TOut]):
 
 def cramer_gan(num_target_features: int) -> CramerGAN:
     """Build a CramerGAN with default architecture"""
-    return CramerGAN(
+    return CramerGAN( # type: ignore
         generator_func=lambda X: deep_wide_generator(X, num_target_features),
         discriminator_func=lambda X, Y: deep_wide_discriminator(
-            tf.concat([X, Y], axis=1)
+            tf.concat([X, Y], axis=1) # type: ignore
         ),
         train_op_func=adversarial_train_op_func
     )

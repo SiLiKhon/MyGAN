@@ -12,6 +12,7 @@ from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
 TIn  = TypeVar("TIn")
 TOut = TypeVar("TOut")
+T_GAN = TypeVar('T_GAN', bound='MyGAN')
 
 class MyGAN(Generic[TIn, TOut]):
     """
@@ -22,7 +23,7 @@ class MyGAN(Generic[TIn, TOut]):
             self,
             generator_func: Callable[[TIn], TOut],
             discriminator_func: Callable[[TIn, TOut], tf.Tensor],
-            losses_func: Callable[[MyGAN[TIn, TOut]], Tuple[tf.Tensor, tf.Tensor]],
+            losses_func: Callable[[T_GAN], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
         ) -> None:
         """
@@ -139,7 +140,7 @@ class MyGAN(Generic[TIn, TOut]):
             self._discriminator_output_int = self.discriminator_func(self._X, self._Y_interpolates)
 
         with tf.name_scope("Training"):
-            self._gen_loss, self._disc_loss = self.losses_func(self)
+            self._gen_loss, self._disc_loss = self.losses_func(self) # type: ignore
 
             self.train_op = self.train_op_func(
                     self._gen_loss,
