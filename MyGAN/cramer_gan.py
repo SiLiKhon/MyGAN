@@ -39,26 +39,33 @@ class CramerGAN(MyGAN[TIn, TOut]):
         super().__init__(
                 generator_func,
                 discriminator_func,
-                lambda gen, real, inter, w: self._losses_func(gen, real, inter, w,
-                                                              gp_factor=gp_factor,
-                                                              gp_mode=gp_mode,
-                                                              surrogate=surrogate),
+                lambda gan: self._losses_func(gan,
+                                              gp_factor=gp_factor,
+                                              gp_mode=gp_mode,
+                                              surrogate=surrogate),
                 train_op_func
             )
 
 
     @staticmethod
     def _losses_func(
-            disc_output_gen: tf.Tensor,
-            disc_output_real: tf.Tensor,
-            disc_output_int: tf.Tensor,
-            weights: Optional[tf.Tensor] = None,
+            gan: MyGAN,
             name: Optional[str] = None,
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
             surrogate: bool = False
         ) -> Tuple[tf.Tensor, tf.Tensor]:
         eps = CramerGAN.epsilon
+
+        weights = gan._W
+        disc_output_gen  = gan._discriminator_output_gen
+        disc_output_real = gan._discriminator_output_real
+        disc_output_int  = gan._discriminator_output_int
+        disc_input_X      = gan._X 
+        disc_input_Y_real = gan._Y
+        disc_input_Y_gen  = gan._generator_output
+        disc_input_Y_int  = gan._Y_interpolates
+
         with tf.name_scope(name, "Losses"):
             if weights is None:
                 weights = tf.ones(shape=[tf.shape(disc_output_gen)[0]])
@@ -91,7 +98,11 @@ class CramerGAN(MyGAN[TIn, TOut]):
                               - tf.norm(int1 - real2 + eps, axis=1)
                             )
         
-                        gradients = tf.gradients(critic_int, [int1])[0]
+                        grad1, grad2 = tf.gradients(critic_int, [disc_input_X, disc_input_Y_int])
+                        gradients = tf.concat([
+                                tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
+                                tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
+                            ], axis=1)
                         slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_mean(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
@@ -106,7 +117,11 @@ class CramerGAN(MyGAN[TIn, TOut]):
                               - tf.norm(real11 - real21 + eps, axis=1)
                               - tf.norm(real12 - real22 + eps, axis=1)
                             )
-                        gradients = tf.gradients(critic_data, [real11])[0]
+                        grad1, grad2 = tf.gradients(critic_data, [disc_input_X, disc_input_Y_real])
+                        gradients = tf.concat([
+                                tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
+                                tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
+                            ], axis=1)
                         slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_sum(tf.square(slopes) * w11 * w12 * w21 * w22, axis=0) / tf.reduce_sum(w11 * w12 * w21 * w22, axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
