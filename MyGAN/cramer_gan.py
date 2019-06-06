@@ -118,6 +118,8 @@ class CramerGAN(MyGAN):
                               - tf.norm(real12 - real22 + eps, axis=1)
                             )
                         grad1, grad2 = tf.gradients(critic_data, [disc_input_X, disc_input_Y_real])
+                        grad1 = tf.split(grad1, 4, axis=0)[0]
+                        grad2 = tf.split(grad2, 4, axis=0)[0]
                         gradients = tf.concat([
                                 tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
                                 tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
