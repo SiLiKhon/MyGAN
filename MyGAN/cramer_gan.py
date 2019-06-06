@@ -10,7 +10,7 @@ from .mygan import MyGAN, TIn, TOut
 from .nns import deep_wide_generator, deep_wide_discriminator
 from .train_utils import adversarial_train_op_func
 
-class CramerGAN(MyGAN[TIn, TOut]):
+class CramerGAN(MyGAN):
     """
     GAN with Cramer metric
     """
@@ -22,7 +22,8 @@ class CramerGAN(MyGAN[TIn, TOut]):
             discriminator_func: Callable[[TIn, TOut], tf.Tensor],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
-            gp_mode: str = ''
+            gp_mode: str = '',
+            surrogate: bool = False
         ) -> None:
         """
         Arguments:
@@ -35,27 +36,37 @@ class CramerGAN(MyGAN[TIn, TOut]):
 
         See MyGAN.__init__ docstring for other arguments.
         """
-        super().__init__(
+        super().__init__( # type: ignore
                 generator_func,
                 discriminator_func,
-                lambda gen, real, inter, w: self._losses_func(gen, real, inter, w,
-                                                              gp_factor=gp_factor,
-                                                              gp_mode=gp_mode),
+                lambda gan: self._losses_func(gan,
+                                              gp_factor=gp_factor,
+                                              gp_mode=gp_mode,
+                                              surrogate=surrogate),
                 train_op_func
             )
 
 
     @staticmethod
     def _losses_func(
-            disc_output_gen: tf.Tensor,
-            disc_output_real: tf.Tensor,
-            disc_output_int: tf.Tensor,
-            weights: Optional[tf.Tensor] = None,
+            gan: MyGAN,
             name: Optional[str] = None,
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
+            surrogate: bool = False
         ) -> Tuple[tf.Tensor, tf.Tensor]:
         eps = CramerGAN.epsilon
+
+        weights = gan._W
+        disc_output_gen  = gan._discriminator_output_gen
+        disc_output_real = gan._discriminator_output_real
+        disc_output_int  = gan._discriminator_output_int
+        disc_input_X      = gan._X 
+        disc_input_Y_real = gan._Y
+        disc_input_Y_int  = gan._Y_interpolates
+        # Not used:
+        # disc_input_Y_gen = gan._generator_output
+
         with tf.name_scope(name, "Losses"):
             if weights is None:
                 weights = tf.ones(shape=[tf.shape(disc_output_gen)[0]])
@@ -64,14 +75,20 @@ class CramerGAN(MyGAN[TIn, TOut]):
             real1, real2 = tf.split(disc_output_real, 2, axis=0)
             int1 , _     = tf.split(disc_output_int , 2, axis=0)
             w1   , w2    = tf.split(weights         , 2, axis=0)
+            if surrogate:
+                real2 = tf.zeros_like(real1)
 
             with tf.name_scope("generator_loss"):
-                gen_loss = (
-                        tf.reduce_sum(tf.norm(real1 - gen1  + eps, axis=1) * w1     , axis=0) / tf.reduce_sum(w1     , axis=0)
-                      + tf.reduce_sum(tf.norm(real2 - gen2  + eps, axis=1) * w2     , axis=0) / tf.reduce_sum(w2     , axis=0)
-                      - tf.reduce_sum(tf.norm(gen1  - gen2  + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
-                      - tf.reduce_sum(tf.norm(real1 - real2 + eps, axis=1) * w1 * w2, axis=0) / tf.reduce_sum(w1 * w2, axis=0)
-                    )
+                gen_loss = tf.reduce_sum(
+                        w1 * w2 * (
+                            tf.norm(real1 - gen2  + eps, axis=1)
+                          + tf.norm(real2 - gen1  + eps, axis=1)
+                          - tf.norm(gen1  - gen2  + eps, axis=1)
+                          - tf.norm(real1 - real2 + eps, axis=1)
+                        ),
+                        axis=0
+                    ) / tf.reduce_sum(w1 * w2, axis=0)
+        
                 gen_loss = tf.identity(gen_loss, name='gen_loss')
 
             if gp_factor is not None:
@@ -82,7 +99,11 @@ class CramerGAN(MyGAN[TIn, TOut]):
                               - tf.norm(int1 - real2 + eps, axis=1)
                             )
         
-                        gradients = tf.gradients(critic_int, [int1])[0]
+                        grad1, grad2 = tf.gradients(critic_int, [disc_input_X, disc_input_Y_int])
+                        gradients = tf.concat([
+                                tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
+                                tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
+                            ], axis=1)
                         slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_mean(tf.square(tf.maximum(tf.abs(slopes) - 1, 0)), axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
@@ -97,7 +118,13 @@ class CramerGAN(MyGAN[TIn, TOut]):
                               - tf.norm(real11 - real21 + eps, axis=1)
                               - tf.norm(real12 - real22 + eps, axis=1)
                             )
-                        gradients = tf.gradients(critic_data, [real11])[0]
+                        grad1, grad2 = tf.gradients(critic_data, [disc_input_X, disc_input_Y_real])
+                        grad1 = tf.split(grad1, 4, axis=0)[0]
+                        grad2 = tf.split(grad2, 4, axis=0)[0]
+                        gradients = tf.concat([
+                                tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
+                                tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
+                            ], axis=1)
                         slopes = tf.norm(tf.reshape(gradients, [tf.shape(gradients)[0], -1]) + eps, axis=1)
                         penalty = tf.reduce_sum(tf.square(slopes) * w11 * w12 * w21 * w22, axis=0) / tf.reduce_sum(w11 * w12 * w21 * w22, axis=0)
                         penalty = tf.identity(penalty, name='gradient_penalty')
@@ -116,10 +143,10 @@ class CramerGAN(MyGAN[TIn, TOut]):
 
 def cramer_gan(num_target_features: int) -> CramerGAN:
     """Build a CramerGAN with default architecture"""
-    return CramerGAN(
+    return CramerGAN( # type: ignore
         generator_func=lambda X: deep_wide_generator(X, num_target_features),
         discriminator_func=lambda X, Y: deep_wide_discriminator(
-            tf.concat([X, Y], axis=1)
+            tf.concat([X, Y], axis=1) # type: ignore
         ),
         train_op_func=adversarial_train_op_func
     )

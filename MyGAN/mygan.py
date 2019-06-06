@@ -12,6 +12,7 @@ from .metric import energy_distance_bootstrap, sliced_ks_in_loops
 
 TIn  = TypeVar("TIn")
 TOut = TypeVar("TOut")
+T_GAN = TypeVar('T_GAN', bound='MyGAN')
 
 class MyGAN(Generic[TIn, TOut]):
     """
@@ -22,7 +23,7 @@ class MyGAN(Generic[TIn, TOut]):
             self,
             generator_func: Callable[[TIn], TOut],
             discriminator_func: Callable[[TIn, TOut], tf.Tensor],
-            losses_func: Callable[[tf.Tensor, tf.Tensor, tf.Tensor, Optional[tf.Tensor]], Tuple[tf.Tensor, tf.Tensor]],
+            losses_func: Callable[[T_GAN], Tuple[tf.Tensor, tf.Tensor]],
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation]
         ) -> None:
         """
@@ -36,10 +37,17 @@ class MyGAN(Generic[TIn, TOut]):
         discriminator_func -- function to build the discriminator. Should follow the
             signature: discriminator_func(X, Y) -> output_tensor. All the tf variables
             should follow the tf.get_variable paradigm to allow for weights reuse.
-        losses_func -- function to construct losses from discriminator outputs on generated
-            samples, real samples and their linear interpolates (for gradient penalty):
-            losses_func(discriminator(X, Y_gen), discriminator(X, Y_real),
-            discriminator(X, Y_interp), weights) -> (generator_loss, discriminator_loss)
+        losses_func -- function to construct losses:
+                            losses_func(gan) -> (generator_loss, discriminator_loss)
+                       the function may use the following variables of the gan object:
+                         - gan._X (conditional variables)
+                         - gan._Y (target variables)
+                         - gan._generator_output (generated Y)
+                         - gan._Y_interpolates (interpolated between real and generated Y variables)
+                         - gan._W (weights)
+                         - gan._discriminator_output_gen (discriminator output on generated variables)
+                         - gan._discriminator_output_real (discriminator output on real variables)
+                         - gan._discriminator_output_int (discriminator output on interpolated variables)
         train_op_func -- function to build the training operation:
             train_op_func(generator_loss, discriminator_loss, generator_weights,
             discriminator_weights) -> training_operation.
@@ -125,19 +133,14 @@ class MyGAN(Generic[TIn, TOut]):
 
         with tf.variable_scope(self.disc_scope, reuse=True):
             alpha = tf.random_uniform(shape=[tf.shape(self._X)[0], 1], minval=0., maxval=1., dtype=self._X.dtype)
-            interpolates = (
+            self._Y_interpolates = (
                     alpha * self._Y
                   + (1 - alpha) * self._generator_output
                 )
-            self._discriminator_output_int = self.discriminator_func(self._X, interpolates)
+            self._discriminator_output_int = self.discriminator_func(self._X, self._Y_interpolates)
 
         with tf.name_scope("Training"):
-            self._gen_loss, self._disc_loss = self.losses_func(
-                    self._discriminator_output_gen,
-                    self._discriminator_output_real,
-                    self._discriminator_output_int,
-                    self._W
-                )
+            self._gen_loss, self._disc_loss = self.losses_func(self) # type: ignore
 
             self.train_op = self.train_op_func(
                     self._gen_loss,
