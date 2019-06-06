@@ -63,8 +63,9 @@ class CramerGAN(MyGAN):
         disc_output_int  = gan._discriminator_output_int
         disc_input_X      = gan._X 
         disc_input_Y_real = gan._Y
-        disc_input_Y_gen  = gan._generator_output
         disc_input_Y_int  = gan._Y_interpolates
+        # Not used:
+        # disc_input_Y_gen = gan._generator_output
 
         with tf.name_scope(name, "Losses"):
             if weights is None:
