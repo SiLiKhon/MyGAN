@@ -149,11 +149,10 @@ class MyGAN(Generic[TIn, TOut]):
                     self.get_disc_weights()
                 )
         
-        with tf.control_dependencies([self.train_op]):
-            gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
-            disc_loss_summary = tf.summary.scalar('Discriminator_loss', self._disc_loss)
-            self.train_summaries += [gen_loss_summary, disc_loss_summary]
-            self.test_summaries  += [gen_loss_summary, disc_loss_summary]
+        gen_loss_summary  = tf.summary.scalar('Generator_loss'    , self._gen_loss )
+        disc_loss_summary = tf.summary.scalar('Discriminator_loss', self._disc_loss)
+        self.train_summaries += [gen_loss_summary, disc_loss_summary]
+        self.test_summaries  += [gen_loss_summary, disc_loss_summary]
     
     def get_gen_weights(self) -> List[tf.Variable]:
         return tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=self.gen_scope)
