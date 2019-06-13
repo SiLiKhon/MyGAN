@@ -23,7 +23,8 @@ class CramerGAN(MyGAN):
             train_op_func: Callable[[tf.Tensor, tf.Tensor, List[tf.Variable], List[tf.Variable]], tf.Operation],
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
-            surrogate: bool = False
+            surrogate: bool = False,
+            power: float = 1.0
         ) -> None:
         """
         Arguments:
@@ -42,7 +43,8 @@ class CramerGAN(MyGAN):
                 lambda gan: self._losses_func(gan,
                                               gp_factor=gp_factor,
                                               gp_mode=gp_mode,
-                                              surrogate=surrogate),
+                                              surrogate=surrogate,
+                                              power=power),
                 train_op_func
             )
 
@@ -53,7 +55,8 @@ class CramerGAN(MyGAN):
             name: Optional[str] = None,
             gp_factor: Optional[Union[tf.Tensor, float]] = None,
             gp_mode: str = '',
-            surrogate: bool = False
+            surrogate: bool = False,
+            power: float = 1.0
         ) -> Tuple[tf.Tensor, tf.Tensor]:
         eps = CramerGAN.epsilon
 
@@ -78,13 +81,19 @@ class CramerGAN(MyGAN):
             if surrogate:
                 real2 = tf.zeros_like(real1)
 
+            def _norm(x, **kwargs):
+                if power == 1.0:
+                    return tf.norm(x, **kwargs)
+                else:
+                    return tf.norm(x, **kwargs)**power
+
             with tf.name_scope("generator_loss"):
                 gen_loss = tf.reduce_sum(
                         w1 * w2 * (
-                            tf.norm(real1 - gen2  + eps, axis=1)
-                          + tf.norm(real2 - gen1  + eps, axis=1)
-                          - tf.norm(gen1  - gen2  + eps, axis=1)
-                          - tf.norm(real1 - real2 + eps, axis=1)
+                            _norm(real1 - gen2  + eps, axis=1)
+                          + _norm(real2 - gen1  + eps, axis=1)
+                          - _norm(gen1  - gen2  + eps, axis=1)
+                          - _norm(real1 - real2 + eps, axis=1)
                         ),
                         axis=0
                     ) / tf.reduce_sum(w1 * w2, axis=0)
@@ -94,12 +103,15 @@ class CramerGAN(MyGAN):
             if gp_factor is not None:
                 with tf.name_scope("gradient_penalty"):
                     if gp_mode == 'wgan_gp_one_sided':
+                        _half = lambda x: tf.split(x, 2, axis=0)[0]
                         critic_int = (
-                                tf.norm(int1 - gen2  + eps, axis=1)
-                              - tf.norm(int1 - real2 + eps, axis=1)
+                                _norm(_half(int1) - _half(gen2 ) + eps, axis=1)
+                              - _norm(_half(int1) - _half(real2) + eps, axis=1)
                             )
         
                         grad1, grad2 = tf.gradients(critic_int, [disc_input_X, disc_input_Y_int])
+                        grad1 = tf.split(grad1, 4, axis=0)[0]
+                        grad2 = tf.split(grad2, 4, axis=0)[0]
                         gradients = tf.concat([
                                 tf.reshape(grad1, [tf.shape(grad1)[0], -1]),
                                 tf.reshape(grad2, [tf.shape(grad2)[0], -1]),
@@ -113,10 +125,10 @@ class CramerGAN(MyGAN):
                         w11   , w12    = tf.split(w1   , 2, axis=0)
                         w21   , w22    = tf.split(w2   , 2, axis=0)
                         critic_data = (
-                                tf.norm(real11 - real12 + eps, axis=1)
-                              + tf.norm(real21 - real22 + eps, axis=1)
-                              - tf.norm(real11 - real21 + eps, axis=1)
-                              - tf.norm(real12 - real22 + eps, axis=1)
+                                _norm(real11 - real12 + eps, axis=1)
+                              + _norm(real21 - real22 + eps, axis=1)
+                              - _norm(real11 - real21 + eps, axis=1)
+                              - _norm(real12 - real22 + eps, axis=1)
                             )
                         grad1, grad2 = tf.gradients(critic_data, [disc_input_X, disc_input_Y_real])
                         grad1 = tf.split(grad1, 4, axis=0)[0]
