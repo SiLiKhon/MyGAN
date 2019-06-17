@@ -70,7 +70,7 @@ def sliced_ks(
                 if w1 is None else \
                  tf.tile(w1[...,tf.newaxis], [1, n_samples])
 
-    w2_tiled = tf.ones_like(X2) \
+    w2_tiled = tf.ones_like(X2_slices) \
                 if w2 is None else \
                  tf.tile(w2[...,tf.newaxis], [1, n_samples])
 
